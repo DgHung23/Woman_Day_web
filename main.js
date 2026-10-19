@@ -11,9 +11,10 @@ const ARL_WISHES = [
 
 const CYBER_CODE_SNIPPETS = [
   {
-    lang: "Python 3.12",
+    lang: "Python",
+    tag: "PY",
     badgeClass: "badge-python",
-    preview: "while self.is_alive(): she.happiness += ∞",
+    preview: "she.happiness += ∞",
     title: "arl_ai_core/celebrate_2010.py",
     code: `# Applied Robotic Lab // AI & Deep Learning Core
 import torch
@@ -36,9 +37,10 @@ if __name__ == "__main__":
 >> Robot ARL đang cúi chào và trao gửi ngàn đóa hoa rực rỡ nhất! 💐🤖`
   },
   {
-    lang: "ROS 2 / C++",
+    lang: "ROS 2",
+    tag: "ROS",
     badgeClass: "badge-cpp",
-    preview: "publish<Love>(\"/arl/women/joy\", 2010)",
+    preview: "publish<Love>(2010)",
     title: "arl_ros2_ws/src/celebrate_node.cpp",
     code: `// ROS 2 Humble // Autonomous Systems Lab
 #include <rclcpp/rclcpp.hpp>
@@ -60,9 +62,10 @@ public:
 [INFO] Status: QoS Best-Effort -> Guaranteed 100% Hạnh Phúc! 🌸`
   },
   {
-    lang: "Rust 2024",
+    lang: "Rust",
+    tag: "RS",
     badgeClass: "badge-rust",
-    preview: "let woman: &'static Inspiration = Lab::genius()",
+    preview: "happy::<2010>()",
     title: "arl_kernel/src/wishes_safe.rs",
     code: `// Memory-safe, concurrency-proof unconditional love
 use arl_lab::{Woman, Robotics, Blessing};
@@ -81,9 +84,10 @@ Running target/release/wishes_safe:
 >> 100% tình cảm chân thành và sự trân trọng từ đại gia đình ARL! ✨`
   },
   {
-    lang: "x86_64 ASM",
+    lang: "x86 ASM",
+    tag: "ASM",
     badgeClass: "badge-asm",
-    preview: "MOV EAX, HAPPINESS; ADD EAX, 2010h; SYSCALL",
+    preview: "MOV JOY, 2010h",
     title: "arl_low_level/firmware_2010.asm",
     code: `; Low-level Hardware Firmware // ARL Robot Brain
 section .text
@@ -98,9 +102,10 @@ _start:
 CPU INTERRUPT 0x80: Mọi chip vi xử lý của ARL đồng loạt thắp sáng đèn led trái tim! 💖`
   },
   {
-    lang: "Embedded C",
+    lang: "MCU C",
+    tag: "MCU",
     badgeClass: "badge-binary",
-    preview: "analogWrite(PIN_LOVE, 255); // 100% Duty Cycle",
+    preview: "analogWrite(LOVE)",
     title: "arl_mcu/motor_control_2010.ino",
     code: `// Arduino / ESP32 Hardware Lab
 const int PIN_LOVE = 10;
@@ -123,9 +128,10 @@ PWM Signal: Frequency 20.10 kHz | Duty Cycle = 100%.
 Điện thế yêu thương: VCC = 5.0V không sụt áp! ⚡`
   },
   {
-    lang: "SQL / Database",
+    lang: "SQL",
+    tag: "SQL",
     badgeClass: "badge-js",
-    preview: "SELECT beauty, talent FROM ARL_Women WHERE 20_10",
+    preview: "SELECT * FROM Love",
     title: "arl_db/wishes_query.sql",
     code: `-- ARL Database Query
 SELECT 
@@ -163,10 +169,14 @@ function initializeARL() {
   try { setupPanelToggle(); } catch (e) { console.warn("Toggle init:", e); }
   try { setupFloatingCodeSystem(); } catch (e) { console.warn("Code init:", e); }
 
-  // Periodic subtle petal drop
+  // Periodic subtle petal & wish banner drop
   setInterval(() => {
     try { createPetal(); } catch(e) {}
   }, 3500);
+
+  setInterval(() => {
+    try { createWishBanner(); } catch(e) {}
+  }, 12000);
 }
 
 // Mobile and readyState aware bootstrapper
@@ -206,7 +216,6 @@ function setupPanelToggle() {
 function setupModal() {
   const modalOverlay = document.getElementById("wishes-modal");
   const openBtn = document.getElementById("open-wishes-btn");
-  const logoBtn = document.getElementById("arl-logo-btn");
   const closeBtn = document.getElementById("modal-close-btn");
   const nextWishBtn = document.getElementById("next-wish-btn");
   const copyBtn = document.getElementById("copy-wish-btn");
@@ -227,7 +236,6 @@ function setupModal() {
   }
 
   openBtn?.addEventListener("click", openModal);
-  logoBtn?.addEventListener("click", openModal);
   closeBtn?.addEventListener("click", closeModal);
 
   modalOverlay?.addEventListener("click", (e) => {
@@ -303,24 +311,35 @@ function setupFloatingCodeSystem() {
   function spawnBadge(snippetData) {
     if (!container) return;
 
+    const isMobile = window.innerWidth <= 768;
+    const maxActive = isMobile ? 2 : 4;
+    if (container.children.length >= maxActive) {
+      return;
+    }
+
     const wrapper = document.createElement("div");
     wrapper.className = "floating-code-item";
 
     const card = document.createElement("div");
     card.className = `code-badge-content ${snippetData.badgeClass}`;
-    card.setAttribute("title", "Click để xem terminal code chúc mừng 20/10!");
+    card.setAttribute("title", "Chạm để xem code terminal chúc mừng 20/10!");
     card.innerHTML = `
-      <span class="code-lang-tag">${snippetData.lang.split(" ")[0]}</span>
+      <span class="code-lang-tag">${snippetData.tag || snippetData.lang.split(" ")[0]}</span>
       <span class="code-snippet-text">${snippetData.preview}</span>
-      <span class="sparkle-icon">⚡</span>
     `;
 
     wrapper.appendChild(card);
 
-    // Position on either Left (4% to 30%) or Right (70% to 92%) so flowers in center remain 100% visible
+    // Lateral gutter positioning (keeps flowers in center completely unobstructed)
     const isLeft = Math.random() > 0.5;
-    const xPos = isLeft ? Math.random() * 26 + 4 : Math.random() * 20 + 70;
-    const duration = Math.random() * 5 + 15; // 15s - 20s smooth drift
+    let xPos;
+    if (isMobile) {
+      // Mobile gutters: Left 3% to 10%, or Right 60% to 68%
+      xPos = isLeft ? Math.random() * 7 + 3 : Math.random() * 7 + 61;
+    } else {
+      xPos = isLeft ? Math.random() * 18 + 4 : Math.random() * 18 + 76;
+    }
+    const duration = Math.random() * 4 + (isMobile ? 14 : 16);
 
     wrapper.style.left = `${xPos}%`;
     wrapper.style.animationDuration = `${duration}s`;
@@ -332,7 +351,6 @@ function setupFloatingCodeSystem() {
     }
 
     wrapper.addEventListener("click", handleClick);
-
     container.appendChild(wrapper);
 
     setTimeout(() => {
@@ -340,20 +358,21 @@ function setupFloatingCodeSystem() {
     }, duration * 1000);
   }
 
-  // Periodic auto spawn
+  // Periodic auto spawn with mobile-friendly pacing
   let spawnCount = 0;
   setInterval(() => {
     const item = CYBER_CODE_SNIPPETS[spawnCount % CYBER_CODE_SNIPPETS.length];
     spawnBadge(item);
     spawnCount++;
-  }, 4000);
+  }, 5000);
 
   // Spawn initial set
   setTimeout(() => {
     spawnBadge(CYBER_CODE_SNIPPETS[0]);
-    setTimeout(() => spawnBadge(CYBER_CODE_SNIPPETS[1]), 1800);
-    setTimeout(() => spawnBadge(CYBER_CODE_SNIPPETS[2]), 3400);
-  }, 1200);
+    if (window.innerWidth > 768) {
+      setTimeout(() => spawnBadge(CYBER_CODE_SNIPPETS[1]), 2500);
+    }
+  }, 1500);
 
   // Terminal Open & Render
   function openTerminal(snippet) {
@@ -572,9 +591,19 @@ function initParticles() {
 }
 
 /* ==========================================================================
-   FLOWER RAIN ANIMATION
+   FLOWER RAIN & 20/10 WISH BANNERS ANIMATION
    ========================================================================== */
 const PETAL_SYMBOLS = ["🌸", "🌺", "🌹", "✨", "💐", "🌷"];
+
+const FALLING_WISH_MESSAGES = [
+  "🌸 Chúc Mừng 20/10! ✨",
+  "💖 Happy Women's Day! 💖",
+  "🌷 Xinh Đẹp & Rạng Rỡ! 🌟",
+  "💐 Luôn Hạnh Phúc & Thành Công! 🌸",
+  "❤️ Yêu Thương Đong Đầy! ✨",
+  "🤖 ARL Gửi Ngàn Yêu Thương! 🌹",
+  "🌺 20/10 Ngập Tràn Niềm Vui! 💐"
+];
 
 function createPetal() {
   const petal = document.createElement("div");
@@ -605,11 +634,42 @@ function triggerPetalBurst(count = 20) {
   }
 }
 
+function createWishBanner() {
+  const banner = document.createElement("div");
+  banner.className = "falling-wish-banner";
+  const text = FALLING_WISH_MESSAGES[Math.floor(Math.random() * FALLING_WISH_MESSAGES.length)];
+  banner.textContent = text;
+
+  const isMobile = window.innerWidth <= 768;
+  const bannerWidth = isMobile ? 180 : 260;
+  const maxLeft = Math.max(10, window.innerWidth - bannerWidth);
+  const startX = Math.random() * maxLeft;
+  const duration = Math.random() * 2 + 5.5; // 5.5s - 7.5s
+
+  banner.style.left = `${startX}px`;
+  banner.style.animationDuration = `${duration}s`;
+
+  document.body.appendChild(banner);
+
+  setTimeout(() => {
+    banner.remove();
+  }, duration * 1000);
+}
+
+function triggerWishBannerBurst(count = 4) {
+  for (let i = 0; i < count; i++) {
+    setTimeout(() => {
+      createWishBanner();
+    }, i * 380);
+  }
+}
+
 function setupFlowerRain() {
   const rainBtn = document.getElementById("petal-rain-btn");
   rainBtn?.addEventListener("click", () => {
     triggerPetalBurst(25);
-    showToast("🌸 Chúc bạn luôn rạng rỡ như hoa mùa xuân!");
+    triggerWishBannerBurst(4);
+    showToast("🌸 Chúc bạn luôn rạng rỡ như hoa mùa xuân! ✨");
   });
 }
 
