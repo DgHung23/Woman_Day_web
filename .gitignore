@@ -1,0 +1,20 @@
+# OS generated files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporary & Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+temp_*
+*_check.png
+test_*.png
+mask_test.png
+dark_test.png
