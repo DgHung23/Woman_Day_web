@@ -612,3 +612,11 @@ function setupFlowerRain() {
     showToast("🌸 Chúc bạn luôn rạng rỡ như hoa mùa xuân!");
   });
 }
+
+// Prevent mobile background rubber-band scrolling while keeping modal scrolling smooth
+document.addEventListener("touchmove", (e) => {
+  const scrollable = e.target.closest(".modal-card, .terminal-window, .terminal-body");
+  if (!scrollable) {
+    e.preventDefault();
+  }
+}, { passive: false });
