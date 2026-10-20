@@ -169,6 +169,7 @@ function initializeARL() {
   try { setupFlowerRain(); } catch (e) { console.warn("Rain init:", e); }
   try { setupPanelToggle(); } catch (e) { console.warn("Toggle init:", e); }
   try { setupFloatingCodeSystem(); } catch (e) { console.warn("Code init:", e); }
+  try { setupFacebookPageLink(); } catch (e) { console.warn("FB link init:", e); }
 
   // Periodic subtle petal & wish banner drop
   setInterval(() => {
@@ -265,15 +266,279 @@ function setupModal() {
     animateWishText(wishTextEl, ARL_WISHES[currentWishIndex]);
   });
 
-  // Copy Wish
-  copyBtn?.addEventListener("click", () => {
-    const textToCopy = `Thân gửi ${displayName.textContent},\n\n${wishTextEl.textContent.trim()}\n\n— Trân trọng, Applied Robotic Lab (ARL) ❤️🤖`;
-    navigator.clipboard.writeText(textToCopy).then(() => {
-      showToast("Đã sao chép lời chúc vào bộ nhớ tạm! 📋");
-    }).catch(() => {
-      showToast("Đã chọn lời chúc!");
-    });
+  // Copy Wish as High-Resolution Rendered Greeting Card Image
+  let isGeneratingCard = false;
+  copyBtn?.addEventListener("click", async () => {
+    if (isGeneratingCard) return;
+    isGeneratingCard = true;
+    const rName = displayName.textContent.trim() || "Bóng Hồng ARL";
+    const wText = wishTextEl.textContent.trim();
+    showToast("⏳ Đang render ảnh thiệp xinh xắn...");
+
+    try {
+      const blob = await generateWishCardBlob(rName, wText);
+      let copiedToClipboard = false;
+
+      // 1. Write image directly to clipboard if supported by browser
+      if (navigator.clipboard && window.ClipboardItem) {
+        try {
+          await navigator.clipboard.write([
+            new ClipboardItem({ "image/png": blob })
+          ]);
+          copiedToClipboard = true;
+        } catch (clipErr) {
+          console.warn("Clipboard image write permission not granted:", clipErr);
+        }
+      }
+
+      // 2. Download the rendered card PNG (guarantees user has image file on all mobile/desktop platforms)
+      const imgUrl = URL.createObjectURL(blob);
+      const downloadLink = document.createElement("a");
+      const cleanName = rName.replace(/[^\w\s\u00C0-\u1EF9]/gi, "").replace(/\s+/g, "_");
+      downloadLink.download = `ARL_Thiep_20_10_${cleanName || "Chuc_Mung"}.png`;
+      downloadLink.href = imgUrl;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      downloadLink.remove();
+      setTimeout(() => URL.revokeObjectURL(imgUrl), 6000);
+
+      // 3. Fallback text copy to clipboard if image clipboard was blocked
+      if (!copiedToClipboard && navigator.clipboard?.writeText) {
+        const textFallback = `Thân gửi ${rName},\n\n${wText}\n\n— Trân trọng, Applied Robotic Lab (ARL) ❤️🤖`;
+        navigator.clipboard.writeText(textFallback).catch(() => {});
+      }
+
+      if (copiedToClipboard) {
+        showToast("🖼️ Đã sao chép ảnh thiệp & tải về máy! 🌸");
+      } else {
+        showToast("🖼️ Đã lưu ảnh thiệp chúc mừng về máy! 🌸");
+      }
+    } catch (err) {
+      console.error("Render card error:", err);
+      // Plain text fallback
+      const textFallback = `Thân gửi ${rName},\n\n${wText}\n\n— Trân trọng, Applied Robotic Lab (ARL) ❤️🤖`;
+      navigator.clipboard?.writeText(textFallback).then(() => {
+        showToast("Đã sao chép lời chúc vào bộ nhớ tạm! 📋");
+      }).catch(() => {
+        showToast("Đã chọn lời chúc! ✨");
+      });
+    } finally {
+      isGeneratingCard = false;
+    }
   });
+}
+
+/* ==========================================================================
+   CANVAS GREETING CARD GENERATOR (HIGH-RES 1080x1080 IMAGE)
+   ========================================================================== */
+function generateWishCardBlob(recipientName, wishText) {
+  return new Promise((resolve) => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 1080;
+    canvas.height = 1080;
+    const ctx = canvas.getContext("2d");
+
+    // Helper: Draw rounded rectangle
+    function roundRect(x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx.lineTo(x + r, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+    }
+
+    // 1. Deep Celestial Background
+    const bgGrad = ctx.createLinearGradient(0, 0, 1080, 1080);
+    bgGrad.addColorStop(0, "#0c1224");
+    bgGrad.addColorStop(0.45, "#1b1433");
+    bgGrad.addColorStop(1, "#280f27");
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, 1080, 1080);
+
+    // 2. Soft Center Romantic Glow
+    const radGlow = ctx.createRadialGradient(540, 520, 60, 540, 520, 500);
+    radGlow.addColorStop(0, "rgba(236, 72, 153, 0.22)");
+    radGlow.addColorStop(0.55, "rgba(0, 210, 255, 0.08)");
+    radGlow.addColorStop(1, "rgba(0, 0, 0, 0)");
+    ctx.fillStyle = radGlow;
+    ctx.fillRect(0, 0, 1080, 1080);
+
+    // 3. Starlight / Sparkles
+    ctx.fillStyle = "rgba(255, 255, 255, 0.75)";
+    const stars = [
+      [120, 140, 2.5], [920, 160, 3], [160, 890, 2], [880, 910, 3],
+      [110, 520, 2], [960, 560, 2.5], [260, 220, 1.8], [780, 240, 2.2],
+      [320, 940, 2], [740, 930, 2.5], [190, 380, 2.5], [890, 420, 2.2]
+    ];
+    stars.forEach(([sx, sy, sr]) => {
+      ctx.beginPath();
+      ctx.arc(sx, sy, sr, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // 4. Double Cyber-Floral Border
+    ctx.strokeStyle = "rgba(0, 210, 255, 0.4)";
+    ctx.lineWidth = 3;
+    roundRect(38, 38, 1004, 1004, 28);
+    ctx.stroke();
+
+    ctx.strokeStyle = "rgba(236, 72, 153, 0.45)";
+    ctx.lineWidth = 1.5;
+    roundRect(50, 50, 980, 980, 22);
+    ctx.stroke();
+
+    // 5. Header Pill Badge
+    ctx.fillStyle = "rgba(0, 210, 255, 0.12)";
+    roundRect(360, 75, 360, 44, 22);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(0, 210, 255, 0.5)";
+    ctx.lineWidth = 1.5;
+    roundRect(360, 75, 360, 44, 22);
+    ctx.stroke();
+
+    ctx.fillStyle = "#00d2ff";
+    ctx.font = "bold 15px 'Montserrat', sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("APPLIED ROBOTIC LAB (ARL)", 540, 103);
+
+    // 6. Header Titles
+    ctx.fillStyle = "#ffd166";
+    ctx.font = "bold 28px 'Montserrat', sans-serif";
+    ctx.fillText("CHÚC MỪNG NGÀY PHỤ NỮ VIỆT NAM", 540, 168);
+
+    const titleGrad = ctx.createLinearGradient(380, 0, 700, 0);
+    titleGrad.addColorStop(0, "#ff7eb3");
+    titleGrad.addColorStop(0.5, "#ff4b8b");
+    titleGrad.addColorStop(1, "#00d2ff");
+    ctx.fillStyle = titleGrad;
+    ctx.font = "bold 44px 'Montserrat', sans-serif";
+    ctx.fillText("20 THÁNG 10", 540, 226);
+
+    // Divider
+    ctx.fillStyle = "#ff7eb3";
+    ctx.font = "20px sans-serif";
+    ctx.fillText("─── 🌸 ✨ 🌸 ───", 540, 265);
+
+    // 7. Recipient Pill
+    ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
+    roundRect(260, 298, 560, 56, 28);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(236, 72, 153, 0.6)";
+    ctx.lineWidth = 2;
+    roundRect(260, 298, 560, 56, 28);
+    ctx.stroke();
+
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 25px 'Montserrat', sans-serif";
+    ctx.fillText(`Thân gửi: ${recipientName} 💖`, 540, 336);
+
+    // 8. Main Wish Content Container Box
+    const boxX = 90;
+    const boxY = 385;
+    const boxW = 900;
+    const boxH = 490;
+    ctx.fillStyle = "rgba(10, 18, 36, 0.88)";
+    roundRect(boxX, boxY, boxW, boxH, 24);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(0, 210, 255, 0.28)";
+    ctx.lineWidth = 2;
+    roundRect(boxX, boxY, boxW, boxH, 24);
+    ctx.stroke();
+
+    // Decorative quotation marks
+    ctx.fillStyle = "rgba(236, 72, 153, 0.35)";
+    ctx.font = "bold 70px serif";
+    ctx.fillText("“", boxX + 50, boxY + 70);
+    ctx.fillText("”", boxX + boxW - 50, boxY + boxH - 25);
+
+    // 9. Wrapped Wish Message
+    ctx.fillStyle = "#f8fafc";
+    ctx.font = "25px 'Montserrat', sans-serif";
+    ctx.textAlign = "center";
+    const maxWidth = 760;
+    const lineHeight = 44;
+
+    const words = wishText.split(/\s+/);
+    const lines = [];
+    let currentLine = "";
+
+    for (let i = 0; i < words.length; i++) {
+      const testLine = currentLine ? `${currentLine} ${words[i]}` : words[i];
+      const metrics = ctx.measureText(testLine);
+      if (metrics.width > maxWidth && currentLine) {
+        lines.push(currentLine);
+        currentLine = words[i];
+      } else {
+        currentLine = testLine;
+      }
+    }
+    if (currentLine) lines.push(currentLine);
+
+    // Center lines vertically within message area
+    const totalTextHeight = lines.length * lineHeight;
+    let textStartY = boxY + 80 + Math.max(0, (230 - totalTextHeight) / 2);
+    lines.forEach((line) => {
+      ctx.fillText(line, 540, textStartY);
+      textStartY += lineHeight;
+    });
+
+    // Signature inside box
+    ctx.fillStyle = "#cbd5e1";
+    ctx.font = "italic 20px 'Montserrat', sans-serif";
+    ctx.fillText("— Trân trọng từ Applied Robotic Lab (ARL) ❤️🤖", 540, boxY + boxH - 85);
+
+    // Cyber code snippet
+    ctx.fillStyle = "#38bdf8";
+    ctx.font = "16px 'Courier New', monospace";
+    ctx.fillText("while (alive) { happiness += 1; love += Infinity; }", 540, boxY + boxH - 42);
+
+    // 10. Footer Website
+    ctx.fillStyle = "#94a3b8";
+    ctx.font = "15px 'Montserrat', sans-serif";
+    ctx.fillText("🌸 https://dghung23.github.io/Woman_Day_web 🌸", 540, 945);
+
+    canvas.toBlob((blob) => {
+      resolve(blob);
+    }, "image/png");
+  });
+}
+
+/* ==========================================================================
+   FACEBOOK IN-APP BROWSER (IAB) REDIRECT HANDLING
+   ========================================================================== */
+function setupFacebookPageLink() {
+  const logoBtn = document.getElementById("arl-logo-btn");
+  if (!logoBtn) return;
+
+  const fbPageId = "61595098361933";
+  const fbWebUrl = "https://www.facebook.com/profile.php?id=61595098361933";
+  const isFbInApp = /FBAN|FBAV|FB_IAB|FB4A|FBIOS/i.test(navigator.userAgent);
+
+  if (isFbInApp) {
+    logoBtn.removeAttribute("target");
+    logoBtn.setAttribute("target", "_self");
+
+    logoBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+      const deepLink = isIOS 
+        ? `fb://profile?id=${fbPageId}` 
+        : `fb://page/${fbPageId}`;
+
+      const timeout = setTimeout(() => {
+        window.location.href = fbWebUrl;
+      }, 700);
+
+      window.location.href = deepLink;
+      window.addEventListener("pagehide", () => clearTimeout(timeout), { once: true });
+    });
+  }
 }
 
 function animateWishText(element, text) {
