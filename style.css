@@ -1384,6 +1384,73 @@ body {
   box-shadow: 0 0 15px rgba(0, 210, 255, 0.25);
 }
 
+.sound-btn.playing {
+  background: rgba(236, 72, 153, 0.22);
+  border-color: #ec4899;
+  color: #fff;
+  box-shadow: 0 0 16px rgba(236, 72, 153, 0.45);
+  animation: pulseMusicBtn 2s ease-in-out infinite;
+}
+
+@keyframes pulseMusicBtn {
+  0%, 100% {
+    box-shadow: 0 0 12px rgba(236, 72, 153, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 24px rgba(236, 72, 153, 0.7);
+  }
+}
+
+/* Sound Indicator Floating Pill */
+.sound-indicator {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: rgba(15, 23, 42, 0.82);
+  border: 1px solid rgba(236, 72, 153, 0.4);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: #fce7f3;
+  padding: 7px 16px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  z-index: 150;
+  opacity: 0;
+  transform: translateY(12px);
+  pointer-events: none;
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sound-indicator.active {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.sound-wave-icon {
+  font-size: 14px;
+  animation: musicWaveAnim 1.4s ease-in-out infinite;
+}
+
+@keyframes musicWaveAnim {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.22); }
+}
+
+@media (max-width: 768px) {
+  .sound-indicator {
+    bottom: 12px;
+    right: 12px;
+    font-size: 11px;
+    padding: 5px 12px;
+  }
+}
+
 .arl-btn:active {
   transform: translateY(1px) scale(0.98);
 }

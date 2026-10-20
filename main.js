@@ -150,11 +150,12 @@ Database Note: Dữ liệu đã được lưu trữ vĩnh viễn trong trái tim
 
 let currentWishIndex = 0;
 let currentCodeIndex = 0;
-let isAudioPlaying = false;
-let audioCtx = null;
-let musicInterval = null;
+let isARLInitialized = false;
 
 function initializeARL() {
+  if (isARLInitialized) return;
+  isARLInitialized = true;
+
   // 1. Initial Bloom Animation Trigger
   document.body.classList.remove("not-loaded");
   setTimeout(() => {
@@ -179,7 +180,7 @@ function initializeARL() {
   }, 12000);
 }
 
-// Mobile and readyState aware bootstrapper
+// Mobile and readyState aware bootstrapper (guaranteed single run via isARLInitialized)
 if (document.readyState === "complete" || document.readyState === "interactive") {
   initializeARL();
 } else {
@@ -433,91 +434,89 @@ function setupFloatingCodeSystem() {
 }
 
 /* ==========================================================================
-   WEB AUDIO API - AMBIENT PIANO / CHIME MUSIC
+   ROMANTIC BACKGROUND MUSIC (CANON IN D MAJOR - 20/10 SPECIAL)
    ========================================================================== */
 function setupAudio() {
+  const bgMusic = document.getElementById("bg-music");
   const musicToggleBtn = document.getElementById("music-toggle-btn");
   const musicText = document.getElementById("music-text");
+  const musicIcon = document.getElementById("music-icon");
   const soundIndicator = document.getElementById("sound-indicator");
 
-  // Soothing Pentatonic Chords
-  const notes = [
-    261.63, 329.63, 392.00, 523.25, // C chord
-    196.00, 246.94, 293.66, 392.00, // G chord
-    220.00, 261.63, 329.63, 440.00, // Am chord
-    174.61, 220.00, 261.63, 349.23  // F chord
-  ];
+  if (!bgMusic) return;
 
-  function playAmbientTone(freq, time, duration = 2.5) {
-    if (!audioCtx) return;
-    try {
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
+  // Set comfortable ambient volume (45%)
+  bgMusic.volume = 0.45;
 
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(freq, time);
-
-      gain.gain.setValueAtTime(0.001, time);
-      gain.gain.exponentialRampToValueAtTime(0.08, time + 0.1);
-      gain.gain.exponentialRampToValueAtTime(0.0001, time + duration);
-
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-
-      osc.start(time);
-      osc.stop(time + duration);
-    } catch (e) {
-      console.warn("Audio error:", e);
-    }
-  }
-
-  function startMusicLoop() {
-    if (!audioCtx) {
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    }
-    if (audioCtx.state === "suspended") {
-      audioCtx.resume();
-    }
-
-    let step = 0;
-    musicInterval = setInterval(() => {
-      const baseTime = audioCtx.currentTime;
-      const chordIndex = Math.floor(step / 4) % 4;
-      const noteInChord = step % 4;
-      const noteFreq = notes[chordIndex * 4 + noteInChord];
-
-      playAmbientTone(noteFreq, baseTime, 2.2);
-
-      if (Math.random() > 0.6) {
-        const bellFreq = [659.25, 783.99, 880.00, 1046.50][Math.floor(Math.random() * 4)];
-        playAmbientTone(bellFreq, baseTime + 0.3, 1.8);
-      }
-
-      step++;
-    }, 550);
-  }
-
-  function stopMusicLoop() {
-    if (musicInterval) {
-      clearInterval(musicInterval);
-      musicInterval = null;
-    }
-  }
-
-  musicToggleBtn?.addEventListener("click", () => {
-    isAudioPlaying = !isAudioPlaying;
-    if (isAudioPlaying) {
-      startMusicLoop();
-      musicText.textContent = "Tắt Nhạc";
-      soundIndicator.classList.add("active");
-      showToast("🎵 Đang phát giai điệu thư giãn...");
+  function updateAudioUI(isPlaying) {
+    if (isPlaying) {
+      if (musicText) musicText.textContent = "Tắt Nhạc";
+      if (musicIcon) musicIcon.textContent = "🔊";
+      musicToggleBtn?.classList.add("playing");
+      soundIndicator?.classList.add("active");
     } else {
-      stopMusicLoop();
-      musicText.textContent = "Bật Nhạc";
-      soundIndicator.classList.remove("active");
+      if (musicText) musicText.textContent = "Bật Nhạc";
+      if (musicIcon) musicIcon.textContent = "🎵";
+      musicToggleBtn?.classList.remove("playing");
+      soundIndicator?.classList.remove("active");
+    }
+  }
+
+  // Sync state directly with HTML5 Audio element events
+  bgMusic.addEventListener("play", () => updateAudioUI(true));
+  bgMusic.addEventListener("pause", () => updateAudioUI(false));
+  bgMusic.addEventListener("ended", () => updateAudioUI(false));
+
+  // Toggle button click handler
+  musicToggleBtn?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (bgMusic.paused) {
+      bgMusic.play().then(() => {
+        showToast("🎵 Đang phát: Canon in D (Giai điệu 20/10) 🌸");
+      }).catch((err) => {
+        console.warn("Audio play prevented:", err);
+      });
+    } else {
+      bgMusic.pause();
       showToast("Đã tắt nhạc nền.");
     }
   });
+
+  // Autoplay handler with automatic gesture fallback
+  let gestureUnlocked = false;
+  function setupOneTimeGestureUnlock() {
+    if (gestureUnlocked) return;
+    const unlockAndPlay = () => {
+      if (gestureUnlocked) return;
+      gestureUnlocked = true;
+      if (bgMusic.paused) {
+        bgMusic.play().then(() => {
+          showToast("🎵 Đang phát: Canon in D (Giai điệu tri ân 20/10) 🌸");
+        }).catch(() => {});
+      }
+      ["click", "touchstart", "keydown"].forEach((evt) => {
+        document.removeEventListener(evt, unlockAndPlay);
+      });
+    };
+
+    ["click", "touchstart", "keydown"].forEach((evt) => {
+      document.addEventListener(evt, unlockAndPlay, { once: true, passive: true });
+    });
+  }
+
+  // Attempt unprompted autoplay on page entrance
+  const startPromise = bgMusic.play();
+  if (startPromise !== undefined) {
+    startPromise.then(() => {
+      updateAudioUI(true);
+    }).catch((err) => {
+      // Browser autoplay policy prevented unmuted playback without prior user interaction
+      console.log("Browser autoplay policy waiting for user interaction:", err);
+      setupOneTimeGestureUnlock();
+    });
+  } else {
+    setupOneTimeGestureUnlock();
+  }
 }
 
 /* ==========================================================================
