@@ -267,7 +267,6 @@ function setupModal() {
     animateWishText(wishTextEl, ARL_WISHES[currentWishIndex]);
   });
 
-  // Copy Wish as High-Resolution Rendered Greeting Card Image
   // Copy Wish as High-Resolution Rendered PNG Image (for instant pasting) + 1080p Video Generation
   let isGeneratingVideo = false;
   copyBtn?.addEventListener("click", async () => {
@@ -279,33 +278,35 @@ function setupModal() {
 
     const rName = displayName.textContent.trim() || "Bóng Hồng ARL";
     const wText = wishTextEl.textContent.trim();
-    showToast("🎬 Đang sao chép hình & render video mở thiệp 1080p Full HD...");
+    showToast("🎬 Đang sao chép hình & tạo video mở thiệp 1080p...");
 
-    try {
-      // 1. Generate crisp 1080x1080 PNG card immediately (< 30ms) for clipboard
-      const pngBlob = await generateCardPngBlob(rName, wText);
-      currentCardPngBlob = pngBlob;
-      let copiedImageToClipboard = false;
+    // 1. Generate PNG card IMMEDIATELY and SYNCHRONOUSLY to preserve user activation gesture
+    const pngBlob = generateCardPngBlobSync(rName, wText);
+    currentCardPngBlob = pngBlob;
+    let copiedImageToClipboard = false;
 
-      // Write PNG image to clipboard immediately within user gesture window
-      if (navigator.clipboard && window.ClipboardItem) {
+    // Immediately trigger clipboard write within the synchronous event handler call
+    if (navigator.clipboard && window.ClipboardItem) {
+      try {
+        await navigator.clipboard.write([
+          new ClipboardItem({ "image/png": pngBlob })
+        ]);
+        copiedImageToClipboard = true;
+      } catch (clipErr) {
+        console.warn("Direct image clipboard write failed:", clipErr);
         try {
           await navigator.clipboard.write([
-            new ClipboardItem({ "image/png": pngBlob })
+            new ClipboardItem({ "image/png": Promise.resolve(pngBlob) })
           ]);
           copiedImageToClipboard = true;
-        } catch (clipErr) {
-          console.warn("Clipboard image write not permitted by browser:", clipErr);
+        } catch (clipErr2) {
+          console.warn("Promise-based image clipboard write also failed:", clipErr2);
         }
       }
+    }
 
-      // Fallback text copy if image clipboard was blocked (e.g. strict in-app browsers)
-      if (!copiedImageToClipboard && navigator.clipboard?.writeText) {
-        const textFallback = `🌸 CHÚC MỪNG 20/10 - APPLIED ROBOTIC LAB (ARL) 🌸\nThân gửi: ${rName}\n\n"${wText}"\n\n— Trân trọng, Applied Robotic Lab (ARL) ❤️🤖\nhttps://dghung23.github.io/Woman_Day_web`;
-        navigator.clipboard.writeText(textFallback).catch(() => {});
-      }
-
-      // 2. Generate smooth 1080x1080 Motion Opening Video (stops and freezes on opened card)
+    // 2. Generate smooth 1080x1080 Motion Opening Video (stops and freezes on opened card)
+    try {
       const { videoBlob, mimeType } = await generateOpeningCardVideoBlob(rName, wText);
       currentVideoBlob = videoBlob;
       if (currentVideoUrl) {
@@ -314,15 +315,15 @@ function setupModal() {
       currentVideoUrl = URL.createObjectURL(videoBlob);
 
       // Auto-download video file
-      const ext = mimeType.includes("mp4") ? "mp4" : "webm";
+      const ext = (mimeType && mimeType.toLowerCase().includes("mp4")) ? "mp4" : "webm";
+      const cleanName = rName.replace(/[^\w\s\u00C0-\u1EF9]/gi, "").replace(/\s+/g, "_");
       const downloadLink = document.createElement("a");
       downloadLink.style.display = "none";
-      const cleanName = rName.replace(/[^\w\s\u00C0-\u1EF9]/gi, "").replace(/\s+/g, "_");
       downloadLink.download = `ARL_Thiep_20_10_MoThiep_${cleanName || "Chuc_Mung"}.${ext}`;
       downloadLink.href = currentVideoUrl;
       document.body.appendChild(downloadLink);
       downloadLink.click();
-      setTimeout(() => downloadLink.remove(), 1000);
+      setTimeout(() => downloadLink.remove(), 2000);
 
       // 3. Open Video Preview Modal & auto-play
       const videoModal = document.getElementById("video-preview-modal");
@@ -335,13 +336,13 @@ function setupModal() {
       }
 
       if (copiedImageToClipboard) {
-        showToast("🎬 Đã tải video 1080p & sao chép hình thiệp (Ctrl+V để dán)! ✨");
+        showToast("🎬 Đã tải Video 1080p & sao chép hình thiệp vào Clipboard (Dán ngay)! ✨");
       } else {
-        showToast("🎬 Đã tải video 1080p mở thiệp thành công! ✨");
+        showToast("🎬 Đã tải Video 1080p mở thiệp thành công! ✨");
       }
     } catch (err) {
       console.error("Render video error:", err);
-      // Fallback: auto-download PNG card
+      // Fallback: download PNG card if browser could not record video
       if (currentCardPngBlob) {
         const pngUrl = URL.createObjectURL(currentCardPngBlob);
         const a = document.createElement("a");
@@ -355,9 +356,7 @@ function setupModal() {
           URL.revokeObjectURL(pngUrl);
         }, 15000);
       }
-      const textFallback = `Thân gửi ${rName},\n\n${wText}\n\n— Trân trọng, Applied Robotic Lab (ARL) ❤️🤖`;
-      navigator.clipboard?.writeText(textFallback).catch(() => {});
-      showToast("Đã tải hình ảnh thiệp 1080p & lưu lời chúc! 🌸");
+      showToast("🎁 Đã tải hình ảnh thiệp 1080p sắc nét! 🌸");
     } finally {
       isGeneratingVideo = false;
       copyBtn.innerHTML = origBtnHtml;
@@ -435,7 +434,14 @@ function setupVideoPreviewModal() {
         ]);
         showToast("✨ Đã sao chép hình thiệp vào clipboard (Ctrl+V để dán)! 📋");
       } catch (err) {
-        showToast("Không thể ghi vào bộ nhớ tạm trình duyệt!");
+        try {
+          await navigator.clipboard.write([
+            new ClipboardItem({ "image/png": Promise.resolve(currentCardPngBlob) })
+          ]);
+          showToast("✨ Đã sao chép hình thiệp vào clipboard (Ctrl+V để dán)! 📋");
+        } catch (err2) {
+          showToast("Không thể ghi ảnh vào bộ nhớ tạm trình duyệt này!");
+        }
       }
     }
   });
@@ -629,63 +635,70 @@ function drawCard(ctx, cx, cy, cw, ch, rName, wText) {
 /* ==========================================================================
    HIGH-RESOLUTION GREETING CARD PNG GENERATOR (1080x1080 FULL HD)
    ========================================================================== */
-function generateCardPngBlob(recipientName, wishText) {
-  return new Promise((resolve) => {
-    const width = 1080;
-    const height = 1080;
-    const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext("2d");
+function generateCardPngBlobSync(recipientName, wishText) {
+  const width = 1080;
+  const height = 1080;
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
 
-    // Soft bright feminine pink gradient
-    const bgGrad = ctx.createLinearGradient(0, 0, width, height);
-    bgGrad.addColorStop(0, "#fff5f8");
-    bgGrad.addColorStop(0.35, "#ffe4ec");
-    bgGrad.addColorStop(0.7, "#fce7f3");
-    bgGrad.addColorStop(1, "#f9a8d4");
-    ctx.fillStyle = bgGrad;
-    ctx.fillRect(0, 0, width, height);
+  // Soft bright feminine pink gradient
+  const bgGrad = ctx.createLinearGradient(0, 0, width, height);
+  bgGrad.addColorStop(0, "#fff5f8");
+  bgGrad.addColorStop(0.35, "#ffe4ec");
+  bgGrad.addColorStop(0.7, "#fce7f3");
+  bgGrad.addColorStop(1, "#f9a8d4");
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0, 0, width, height);
 
-    // Radiant soft glow
-    const glow = ctx.createRadialGradient(540, 540, 60, 540, 540, 520);
-    glow.addColorStop(0, "rgba(255, 255, 255, 0.92)");
-    glow.addColorStop(1, "rgba(255, 255, 255, 0)");
-    ctx.fillStyle = glow;
-    ctx.fillRect(0, 0, width, height);
+  // Radiant soft glow
+  const glow = ctx.createRadialGradient(540, 540, 60, 540, 540, 520);
+  glow.addColorStop(0, "rgba(255, 255, 255, 0.92)");
+  glow.addColorStop(1, "rgba(255, 255, 255, 0)");
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, width, height);
 
-    // Top banner
-    ctx.fillStyle = "#be185d";
-    ctx.font = "bold 16px 'Montserrat', sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("APPLIED ROBOTIC LAB (ARL) • 20/10/2026", 540, 32);
+  // Top banner
+  ctx.fillStyle = "#be185d";
+  ctx.font = "bold 16px 'Montserrat', sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("APPLIED ROBOTIC LAB (ARL) • 20/10/2026", 540, 32);
 
-    // Floating petals
-    const petals = [
-      { x: 90, y: 110, s: 22, a: 0.3 },
-      { x: 230, y: 260, s: 18, a: 0.9 },
-      { x: 930, y: 150, s: 24, a: -0.5 },
-      { x: 880, y: 380, s: 20, a: 1.3 },
-      { x: 120, y: 720, s: 22, a: -0.7 },
-      { x: 960, y: 840, s: 18, a: 0.6 },
-      { x: 480, y: 90, s: 16, a: 0.1 },
-      { x: 740, y: 920, s: 22, a: -0.8 }
-    ];
-    petals.forEach(p => {
-      drawPetal(ctx, p.x, p.y, p.s, p.a, "rgba(244, 114, 182, 0.7)");
-    });
-
-    // Draw full crisp 1080p card
-    drawCard(ctx, 40, 40, 1000, 1000, recipientName, wishText);
-
-    // Sparkles
-    drawSparkle(ctx, 80, 85, 20, "#ffffff", 0.4);
-    drawSparkle(ctx, 1000, 95, 22, "#fef08a", 0.8);
-
-    canvas.toBlob((blob) => {
-      resolve(blob);
-    }, "image/png");
+  // Floating petals
+  const petals = [
+    { x: 90, y: 110, s: 22, a: 0.3 },
+    { x: 230, y: 260, s: 18, a: 0.9 },
+    { x: 930, y: 150, s: 24, a: -0.5 },
+    { x: 880, y: 380, s: 20, a: 1.3 },
+    { x: 120, y: 720, s: 22, a: -0.7 },
+    { x: 960, y: 840, s: 18, a: 0.6 },
+    { x: 480, y: 90, s: 16, a: 0.1 },
+    { x: 740, y: 920, s: 22, a: -0.8 }
+  ];
+  petals.forEach(p => {
+    drawPetal(ctx, p.x, p.y, p.s, p.a, "rgba(244, 114, 182, 0.7)");
   });
+
+  // Draw full crisp 1080p card
+  drawCard(ctx, 40, 40, 1000, 1000, recipientName, wishText);
+
+  // Sparkles
+  drawSparkle(ctx, 80, 85, 20, "#ffffff", 0.4);
+  drawSparkle(ctx, 1000, 95, 22, "#fef08a", 0.8);
+
+  const dataUrl = canvas.toDataURL("image/png");
+  const bstr = atob(dataUrl.split(",")[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  return new Blob([u8arr], { type: "image/png" });
+}
+
+function generateCardPngBlob(recipientName, wishText) {
+  return Promise.resolve(generateCardPngBlobSync(recipientName, wishText));
 }
 
 /* ==========================================================================
@@ -865,17 +878,49 @@ function generateOpeningCardVideoBlob(recipientName, wishText) {
         ctx.restore();
       }
 
-      const mimeType = (window.MediaRecorder && MediaRecorder.isTypeSupported('video/mp4;codecs=avc1'))
-        ? 'video/mp4;codecs=avc1'
-        : ((window.MediaRecorder && MediaRecorder.isTypeSupported('video/mp4'))
-            ? 'video/mp4'
-            : 'video/webm;codecs=vp9');
+      function getSupportedVideoMimeType() {
+        if (typeof window === "undefined" || !window.MediaRecorder) return "";
+        const candidates = [
+          "video/mp4",
+          "video/mp4;codecs=avc1",
+          "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
+          "video/webm;codecs=vp9",
+          "video/webm;codecs=vp8",
+          "video/webm;codecs=h264",
+          "video/webm"
+        ];
+        for (const t of candidates) {
+          try {
+            if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) {
+              return t;
+            }
+          } catch (e) {}
+        }
+        return "";
+      }
 
-      const stream = canvas.captureStream(30);
-      const recorder = new MediaRecorder(stream, {
-        mimeType: mimeType,
-        videoBitsPerSecond: 6000000
-      });
+      const stream = (canvas.captureStream && canvas.captureStream(25)) || (canvas.mozCaptureStream && canvas.mozCaptureStream(25));
+      if (!stream) {
+        throw new Error("canvas.captureStream is not supported in this browser");
+      }
+
+      const mimeType = getSupportedVideoMimeType();
+      let recorder = null;
+      if (mimeType) {
+        try {
+          recorder = new MediaRecorder(stream, { mimeType });
+        } catch (e) {
+          console.warn("Failed with mimeType " + mimeType + ", trying default MediaRecorder:", e);
+        }
+      }
+      if (!recorder) {
+        try {
+          recorder = new MediaRecorder(stream);
+        } catch (e) {
+          console.warn("Failed default MediaRecorder:", e);
+          throw e;
+        }
+      }
 
       const chunks = [];
       recorder.ondataavailable = (e) => {
@@ -884,26 +929,27 @@ function generateOpeningCardVideoBlob(recipientName, wishText) {
 
       const recordPromise = new Promise((res) => {
         recorder.onstop = () => {
-          const blob = new Blob(chunks, { type: mimeType });
-          res({ videoBlob: blob, mimeType });
+          const actualMime = (recorder && recorder.mimeType) || mimeType || "video/mp4";
+          const blob = new Blob(chunks, { type: actualMime });
+          res({ videoBlob: blob, mimeType: actualMime });
         };
       });
 
       recorder.start();
 
-      const totalFrames = 135; // 4.5 seconds @ 30fps
-      const fps = 30;
+      const totalFrames = 80; // ~3.2 seconds @ 25fps
+      const fps = 25;
 
       for (let i = 0; i < totalFrames; i++) {
         const t = i / fps;
         ctx.clearRect(0, 0, width, height);
         drawBg(t);
 
-        if (t < 0.6) {
+        if (t < 0.5) {
           drawEnvelope(0, 1);
           drawPocket(1);
-        } else if (t >= 0.6 && t < 1.6) {
-          const p = (t - 0.6) / 1.0;
+        } else if (t >= 0.5 && t < 1.2) {
+          const p = (t - 0.5) / 0.7;
           const flapP = p * 2.0;
           const sealA = Math.max(0, 1 - p * 2.2);
           drawEnvelope(flapP, sealA);
@@ -917,9 +963,9 @@ function generateOpeningCardVideoBlob(recipientName, wishText) {
             ctx.restore();
           }
           drawPocket(1);
-        } else if (t >= 1.6 && t < 2.5) {
+        } else if (t >= 1.2 && t < 2.0) {
           drawEnvelope(2.0, 0);
-          const slideP = (t - 1.6) / 0.9;
+          const slideP = (t - 1.2) / 0.8;
           const curY = 460 - slideP * 240;
           ctx.save();
           ctx.beginPath();
@@ -928,8 +974,8 @@ function generateOpeningCardVideoBlob(recipientName, wishText) {
           drawCard(ctx, 230, curY, 620, 520, recipientName, wishText);
           ctx.restore();
           drawPocket(0.95);
-        } else if (t >= 2.5 && t < 3.5) {
-          const expP = (t - 2.5) / 1.0;
+        } else if (t >= 2.0 && t < 2.7) {
+          const expP = (t - 2.0) / 0.7;
           const curW = 620 + (1000 - 620) * expP;
           const curH = 520 + (1000 - 520) * expP;
           const curX = (width - curW) / 2;
@@ -947,7 +993,7 @@ function generateOpeningCardVideoBlob(recipientName, wishText) {
           drawSparkle(ctx, 1000, 95, 22, "#fef08a", t * 1.2);
         }
 
-        await new Promise((r) => setTimeout(r, 33));
+        await new Promise((r) => setTimeout(r, 40));
       }
 
       recorder.stop();
