@@ -165,6 +165,7 @@ function initializeARL() {
   // 2. Safely initialize each module
   try { initParticles(); } catch (e) { console.warn("Particles init:", e); }
   try { setupModal(); } catch (e) { console.warn("Modal init:", e); }
+  try { setupVideoPreviewModal(); } catch (e) { console.warn("Video modal init:", e); }
   try { setupAudio(); } catch (e) { console.warn("Audio init:", e); }
   try { setupFlowerRain(); } catch (e) { console.warn("Rain init:", e); }
   try { setupPanelToggle(); } catch (e) { console.warn("Toggle init:", e); }
@@ -267,21 +268,26 @@ function setupModal() {
   });
 
   // Copy Wish as High-Resolution Rendered Greeting Card Image
-  // Copy Wish as High-Resolution Rendered PNG Image (for instant pasting) + Silent Background Animated GIF Download
-  let isGeneratingCard = false;
+  // Copy Wish as High-Resolution Rendered PNG Image (for instant pasting) + 1080p Video Generation
+  let isGeneratingVideo = false;
   copyBtn?.addEventListener("click", async () => {
-    if (isGeneratingCard) return;
-    isGeneratingCard = true;
+    if (isGeneratingVideo) return;
+    isGeneratingVideo = true;
+    const origBtnHtml = copyBtn.innerHTML;
+    copyBtn.innerHTML = '<span>⏳</span> Đang tạo Video 1080p...';
+    copyBtn.disabled = true;
+
     const rName = displayName.textContent.trim() || "Bóng Hồng ARL";
     const wText = wishTextEl.textContent.trim();
-    showToast("⏳ Đang sao chép hình & tạo GIF mở thiệp...");
+    showToast("🎬 Đang sao chép hình & render video mở thiệp 1080p Full HD...");
 
     try {
-      // 1. Generate crisp 720x720 PNG card immediately (< 20ms) for clipboard
+      // 1. Generate crisp 1080x1080 PNG card immediately (< 30ms) for clipboard
       const pngBlob = await generateCardPngBlob(rName, wText);
+      currentCardPngBlob = pngBlob;
       let copiedImageToClipboard = false;
 
-      // 2. Write PNG image to clipboard immediately within user gesture window
+      // Write PNG image to clipboard immediately within user gesture window
       if (navigator.clipboard && window.ClipboardItem) {
         try {
           await navigator.clipboard.write([
@@ -299,280 +305,338 @@ function setupModal() {
         navigator.clipboard.writeText(textFallback).catch(() => {});
       }
 
-      // 3. Generate smooth 720x720 Animated Opening Envelope GIF in background and auto-download
-      try {
-        const gifBlob = await generateOpeningCardGifBlob(rName, wText);
-        const gifUrl = URL.createObjectURL(gifBlob);
-        const downloadLink = document.createElement("a");
-        downloadLink.style.display = "none";
-        const cleanName = rName.replace(/[^\w\s\u00C0-\u1EF9]/gi, "").replace(/\s+/g, "_");
-        downloadLink.download = `ARL_Thiep_20_10_MoThiep_${cleanName || "Chuc_Mung"}.gif`;
-        downloadLink.href = gifUrl;
-        document.body.appendChild(downloadLink);
-        downloadLink.click();
-        setTimeout(() => {
-          downloadLink.remove();
-          URL.revokeObjectURL(gifUrl);
-        }, 15000);
-      } catch (gifErr) {
-        console.warn("GIF generation error:", gifErr);
-        // Fallback to downloading the PNG card if GIF encoder failed
-        const pngUrl = URL.createObjectURL(pngBlob);
-        const downloadLink = document.createElement("a");
-        downloadLink.style.display = "none";
-        const cleanName = rName.replace(/[^\w\s\u00C0-\u1EF9]/gi, "").replace(/\s+/g, "_");
-        downloadLink.download = `ARL_Thiep_20_10_${cleanName || "Chuc_Mung"}.png`;
-        downloadLink.href = pngUrl;
-        document.body.appendChild(downloadLink);
-        downloadLink.click();
-        setTimeout(() => {
-          downloadLink.remove();
-          URL.revokeObjectURL(pngUrl);
-        }, 15000);
+      // 2. Generate smooth 1080x1080 Motion Opening Video (stops and freezes on opened card)
+      const { videoBlob, mimeType } = await generateOpeningCardVideoBlob(rName, wText);
+      currentVideoBlob = videoBlob;
+      if (currentVideoUrl) {
+        URL.revokeObjectURL(currentVideoUrl);
+      }
+      currentVideoUrl = URL.createObjectURL(videoBlob);
+
+      // Auto-download video file
+      const ext = mimeType.includes("mp4") ? "mp4" : "webm";
+      const downloadLink = document.createElement("a");
+      downloadLink.style.display = "none";
+      const cleanName = rName.replace(/[^\w\s\u00C0-\u1EF9]/gi, "").replace(/\s+/g, "_");
+      downloadLink.download = `ARL_Thiep_20_10_MoThiep_${cleanName || "Chuc_Mung"}.${ext}`;
+      downloadLink.href = currentVideoUrl;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      setTimeout(() => downloadLink.remove(), 1000);
+
+      // 3. Open Video Preview Modal & auto-play
+      const videoModal = document.getElementById("video-preview-modal");
+      const videoPlayer = document.getElementById("card-video-player");
+      if (videoModal && videoPlayer) {
+        videoPlayer.src = currentVideoUrl;
+        videoModal.classList.add("active");
+        videoModal.setAttribute("aria-hidden", "false");
+        videoPlayer.play().catch(() => {});
       }
 
       if (copiedImageToClipboard) {
-        showToast("🎁 Đã sao chép hình thiệp (Dán / Ctrl+V ngay) & tải ngầm GIF mở thiệp! 🌸");
+        showToast("🎬 Đã tải video 1080p & sao chép hình thiệp (Ctrl+V để dán)! ✨");
       } else {
-        showToast("🎁 Đã tải ngầm GIF mở thiệp & sao chép lời chúc về máy! 🌸");
+        showToast("🎬 Đã tải video 1080p mở thiệp thành công! ✨");
       }
     } catch (err) {
-      console.error("Render card error:", err);
+      console.error("Render video error:", err);
+      // Fallback: auto-download PNG card
+      if (currentCardPngBlob) {
+        const pngUrl = URL.createObjectURL(currentCardPngBlob);
+        const a = document.createElement("a");
+        a.href = pngUrl;
+        const cleanName = rName.replace(/[^\w\s\u00C0-\u1EF9]/gi, "").replace(/\s+/g, "_");
+        a.download = `ARL_Thiep_20_10_${cleanName || "Chuc_Mung"}.png`;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+          a.remove();
+          URL.revokeObjectURL(pngUrl);
+        }, 15000);
+      }
       const textFallback = `Thân gửi ${rName},\n\n${wText}\n\n— Trân trọng, Applied Robotic Lab (ARL) ❤️🤖`;
-      navigator.clipboard?.writeText(textFallback).then(() => {
-        showToast("Đã sao chép lời chúc vào bộ nhớ tạm! 📋");
-      }).catch(() => {
-        showToast("Đã chọn lời chúc! ✨");
-      });
+      navigator.clipboard?.writeText(textFallback).catch(() => {});
+      showToast("Đã tải hình ảnh thiệp 1080p & lưu lời chúc! 🌸");
     } finally {
-      isGeneratingCard = false;
+      isGeneratingVideo = false;
+      copyBtn.innerHTML = origBtnHtml;
+      copyBtn.disabled = false;
     }
   });
 }
 
 /* ==========================================================================
-   CANVAS GREETING CARD GENERATOR (HIGH-RES 1080x1080 IMAGE)
+   VIDEO PREVIEW MODAL LOGIC & CONTROLS
    ========================================================================== */
-function generateWishCardBlob(recipientName, wishText) {
-  return new Promise((resolve) => {
-    const canvas = document.createElement("canvas");
-    canvas.width = 1080;
-    canvas.height = 1080;
-    const ctx = canvas.getContext("2d");
+let currentVideoBlob = null;
+let currentVideoUrl = null;
+let currentCardPngBlob = null;
 
-    // Helper: Draw rounded rectangle
-    function roundRect(x, y, w, h, r) {
-      ctx.beginPath();
-      ctx.moveTo(x + r, y);
-      ctx.lineTo(x + w - r, y);
-      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-      ctx.lineTo(x + w, y + h - r);
-      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-      ctx.lineTo(x + r, y + h);
-      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-      ctx.lineTo(x, y + r);
-      ctx.quadraticCurveTo(x, y, x + r, y);
-      ctx.closePath();
+function setupVideoPreviewModal() {
+  const modal = document.getElementById("video-preview-modal");
+  const closeBtn = document.getElementById("video-close-btn");
+  const player = document.getElementById("card-video-player");
+  const replayBtn = document.getElementById("video-replay-btn");
+  const downloadBtn = document.getElementById("video-download-btn");
+  const copyImgBtn = document.getElementById("video-copy-img-btn");
+
+  function closeVideoModal() {
+    if (!modal) return;
+    modal.classList.remove("active");
+    modal.setAttribute("aria-hidden", "true");
+    if (player) {
+      player.pause();
     }
+  }
 
-    // 1. Deep Celestial Background
-    const bgGrad = ctx.createLinearGradient(0, 0, 1080, 1080);
-    bgGrad.addColorStop(0, "#0c1224");
-    bgGrad.addColorStop(0.45, "#1b1433");
-    bgGrad.addColorStop(1, "#280f27");
-    ctx.fillStyle = bgGrad;
-    ctx.fillRect(0, 0, 1080, 1080);
+  closeBtn?.addEventListener("click", closeVideoModal);
+  modal?.addEventListener("click", (e) => {
+    if (e.target === modal) closeVideoModal();
+  });
 
-    // 2. Soft Center Romantic Glow
-    const radGlow = ctx.createRadialGradient(540, 520, 60, 540, 520, 500);
-    radGlow.addColorStop(0, "rgba(236, 72, 153, 0.22)");
-    radGlow.addColorStop(0.55, "rgba(0, 210, 255, 0.08)");
-    radGlow.addColorStop(1, "rgba(0, 0, 0, 0)");
-    ctx.fillStyle = radGlow;
-    ctx.fillRect(0, 0, 1080, 1080);
+  replayBtn?.addEventListener("click", () => {
+    if (player) {
+      player.currentTime = 0;
+      player.play().catch(() => {});
+    }
+  });
 
-    // 3. Starlight / Sparkles
-    ctx.fillStyle = "rgba(255, 255, 255, 0.75)";
-    const stars = [
-      [120, 140, 2.5], [920, 160, 3], [160, 890, 2], [880, 910, 3],
-      [110, 520, 2], [960, 560, 2.5], [260, 220, 1.8], [780, 240, 2.2],
-      [320, 940, 2], [740, 930, 2.5], [190, 380, 2.5], [890, 420, 2.2]
-    ];
-    stars.forEach(([sx, sy, sr]) => {
-      ctx.beginPath();
-      ctx.arc(sx, sy, sr, 0, Math.PI * 2);
-      ctx.fill();
-    });
+  downloadBtn?.addEventListener("click", () => {
+    if (!currentVideoUrl) {
+      showToast("Chưa có video để tải!");
+      return;
+    }
+    const displayName = document.getElementById("display-name");
+    const rName = displayName ? displayName.textContent.trim() : "Bong_Hong_ARL";
+    const cleanName = rName.replace(/[^\w\s\u00C0-\u1EF9]/gi, "").replace(/\s+/g, "_");
+    const ext = (currentVideoBlob && currentVideoBlob.type && currentVideoBlob.type.includes("mp4")) ? "mp4" : "webm";
+    const a = document.createElement("a");
+    a.href = currentVideoUrl;
+    a.download = `ARL_Thiep_20_10_MoThiep_${cleanName || "Chuc_Mung"}.${ext}`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => a.remove(), 1000);
+    showToast("🎬 Đang tải lại video mở thiệp 1080p!");
+  });
 
-    // 4. Double Cyber-Floral Border
-    ctx.strokeStyle = "rgba(0, 210, 255, 0.4)";
-    ctx.lineWidth = 3;
-    roundRect(38, 38, 1004, 1004, 28);
-    ctx.stroke();
-
-    ctx.strokeStyle = "rgba(236, 72, 153, 0.45)";
-    ctx.lineWidth = 1.5;
-    roundRect(50, 50, 980, 980, 22);
-    ctx.stroke();
-
-    // 5. Header Pill Badge
-    ctx.fillStyle = "rgba(0, 210, 255, 0.12)";
-    roundRect(360, 75, 360, 44, 22);
-    ctx.fill();
-    ctx.strokeStyle = "rgba(0, 210, 255, 0.5)";
-    ctx.lineWidth = 1.5;
-    roundRect(360, 75, 360, 44, 22);
-    ctx.stroke();
-
-    ctx.fillStyle = "#00d2ff";
-    ctx.font = "bold 15px 'Montserrat', sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("APPLIED ROBOTIC LAB (ARL)", 540, 103);
-
-    // 6. Header Titles
-    ctx.fillStyle = "#ffd166";
-    ctx.font = "bold 28px 'Montserrat', sans-serif";
-    ctx.fillText("CHÚC MỪNG NGÀY PHỤ NỮ VIỆT NAM", 540, 168);
-
-    const titleGrad = ctx.createLinearGradient(380, 0, 700, 0);
-    titleGrad.addColorStop(0, "#ff7eb3");
-    titleGrad.addColorStop(0.5, "#ff4b8b");
-    titleGrad.addColorStop(1, "#00d2ff");
-    ctx.fillStyle = titleGrad;
-    ctx.font = "bold 44px 'Montserrat', sans-serif";
-    ctx.fillText("20 THÁNG 10", 540, 226);
-
-    // Divider
-    ctx.fillStyle = "#ff7eb3";
-    ctx.font = "20px sans-serif";
-    ctx.fillText("─── 🌸 ✨ 🌸 ───", 540, 265);
-
-    // 7. Recipient Pill
-    ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
-    roundRect(260, 298, 560, 56, 28);
-    ctx.fill();
-    ctx.strokeStyle = "rgba(236, 72, 153, 0.6)";
-    ctx.lineWidth = 2;
-    roundRect(260, 298, 560, 56, 28);
-    ctx.stroke();
-
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 25px 'Montserrat', sans-serif";
-    ctx.fillText(`Thân gửi: ${recipientName} 💖`, 540, 336);
-
-    // 8. Main Wish Content Container Box
-    const boxX = 90;
-    const boxY = 385;
-    const boxW = 900;
-    const boxH = 490;
-    ctx.fillStyle = "rgba(10, 18, 36, 0.88)";
-    roundRect(boxX, boxY, boxW, boxH, 24);
-    ctx.fill();
-    ctx.strokeStyle = "rgba(0, 210, 255, 0.28)";
-    ctx.lineWidth = 2;
-    roundRect(boxX, boxY, boxW, boxH, 24);
-    ctx.stroke();
-
-    // Decorative quotation marks
-    ctx.fillStyle = "rgba(236, 72, 153, 0.35)";
-    ctx.font = "bold 70px serif";
-    ctx.fillText("“", boxX + 50, boxY + 70);
-    ctx.fillText("”", boxX + boxW - 50, boxY + boxH - 25);
-
-    // 9. Wrapped Wish Message
-    ctx.fillStyle = "#f8fafc";
-    ctx.font = "25px 'Montserrat', sans-serif";
-    ctx.textAlign = "center";
-    const maxWidth = 760;
-    const lineHeight = 44;
-
-    const words = wishText.split(/\s+/);
-    const lines = [];
-    let currentLine = "";
-
-    for (let i = 0; i < words.length; i++) {
-      const testLine = currentLine ? `${currentLine} ${words[i]}` : words[i];
-      const metrics = ctx.measureText(testLine);
-      if (metrics.width > maxWidth && currentLine) {
-        lines.push(currentLine);
-        currentLine = words[i];
-      } else {
-        currentLine = testLine;
+  copyImgBtn?.addEventListener("click", async () => {
+    if (!currentCardPngBlob) {
+      const displayName = document.getElementById("display-name");
+      const wishTextEl = document.getElementById("typewriter-wish");
+      const rName = displayName ? displayName.textContent.trim() : "Bóng Hồng ARL";
+      const wText = wishTextEl ? wishTextEl.textContent.trim() : "";
+      currentCardPngBlob = await generateCardPngBlob(rName, wText);
+    }
+    if (navigator.clipboard && window.ClipboardItem && currentCardPngBlob) {
+      try {
+        await navigator.clipboard.write([
+          new ClipboardItem({ "image/png": currentCardPngBlob })
+        ]);
+        showToast("✨ Đã sao chép hình thiệp vào clipboard (Ctrl+V để dán)! 📋");
+      } catch (err) {
+        showToast("Không thể ghi vào bộ nhớ tạm trình duyệt!");
       }
     }
-    if (currentLine) lines.push(currentLine);
-
-    // Center lines vertically within message area
-    const totalTextHeight = lines.length * lineHeight;
-    let textStartY = boxY + 80 + Math.max(0, (230 - totalTextHeight) / 2);
-    lines.forEach((line) => {
-      ctx.fillText(line, 540, textStartY);
-      textStartY += lineHeight;
-    });
-
-    // Signature inside box
-    ctx.fillStyle = "#cbd5e1";
-    ctx.font = "italic 20px 'Montserrat', sans-serif";
-    ctx.fillText("— Trân trọng từ Applied Robotic Lab (ARL) ❤️🤖", 540, boxY + boxH - 85);
-
-    // Cyber code snippet
-    ctx.fillStyle = "#38bdf8";
-    ctx.font = "16px 'Courier New', monospace";
-    ctx.fillText("while (alive) { happiness += 1; love += Infinity; }", 540, boxY + boxH - 42);
-
-    // 10. Footer Website
-    ctx.fillStyle = "#94a3b8";
-    ctx.font = "15px 'Montserrat', sans-serif";
-    ctx.fillText("🌸 https://dghung23.github.io/Woman_Day_web 🌸", 540, 945);
-
-    canvas.toBlob((blob) => {
-      resolve(blob);
-    }, "image/png");
   });
 }
 
 /* ==========================================================================
-   HIGH-RESOLUTION GREETING CARD PNG GENERATOR (720x720) FOR INSTANT CLIPBOARD
+   SHARED 1080P DRAWING HELPERS
+   ========================================================================== */
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+function drawSparkle(ctx, x, y, size, color, rot = 0) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(rot);
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  for (let i = 0; i < 4; i++) {
+    ctx.lineTo(Math.cos((i * Math.PI) / 2) * size, Math.sin((i * Math.PI) / 2) * size);
+    ctx.lineTo(Math.cos(((i + 0.5) * Math.PI) / 2) * (size * 0.28), Math.sin(((i + 0.5) * Math.PI) / 2) * (size * 0.28));
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawHeart(ctx, x, y, size, color) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  const topCurveHeight = size * 0.3;
+  ctx.moveTo(0, topCurveHeight);
+  ctx.bezierCurveTo(0, 0, -size / 2, 0, -size / 2, topCurveHeight);
+  ctx.bezierCurveTo(-size / 2, (size + topCurveHeight) / 2, 0, (size + topCurveHeight) / 2, 0, size);
+  ctx.bezierCurveTo(0, (size + topCurveHeight) / 2, size / 2, (size + topCurveHeight) / 2, size / 2, topCurveHeight);
+  ctx.bezierCurveTo(size / 2, 0, 0, 0, 0, topCurveHeight);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawPetal(ctx, x, y, size, angle, color) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(0, -size);
+  ctx.bezierCurveTo(size * 0.8, -size * 0.8, size * 0.7, size * 0.6, 0, size);
+  ctx.bezierCurveTo(-size * 0.7, size * 0.6, -size * 0.8, -size * 0.8, 0, -size);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawCard(ctx, cx, cy, cw, ch, rName, wText) {
+  // Pure White Card
+  ctx.fillStyle = "#ffffff";
+  roundRect(ctx, cx, cy, cw, ch, 32);
+  ctx.fill();
+
+  // Outer Solid Rose Border
+  ctx.strokeStyle = "#f472b6";
+  ctx.lineWidth = 5.5;
+  roundRect(ctx, cx, cy, cw, ch, 32);
+  ctx.stroke();
+
+  // Inner Delicate Accent Border
+  ctx.strokeStyle = "#fda4af";
+  ctx.lineWidth = 2.8;
+  roundRect(ctx, cx + 12, cy + 12, cw - 24, ch - 24, 24);
+  ctx.stroke();
+
+  // Header badge
+  const pillW = Math.min(cw - 120, 480);
+  const pillH = 48;
+  const pillX = cx + (cw - pillW) / 2;
+  const pillY = cy + 30;
+  ctx.fillStyle = "#fff1f5";
+  roundRect(ctx, pillX, pillY, pillW, pillH, 24);
+  ctx.fill();
+  ctx.strokeStyle = "#f472b6";
+  ctx.lineWidth = 2.5;
+  ctx.stroke();
+
+  ctx.fillStyle = "#9d174d";
+  ctx.font = "bold 19px 'Montserrat', sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("APPLIED ROBOTIC LAB (ARL)", cx + cw / 2, pillY + 31);
+
+  // Titles
+  ctx.fillStyle = "#831843";
+  ctx.font = "bold 25px 'Montserrat', sans-serif";
+  ctx.fillText("CHÚC MỪNG NGÀY PHỤ NỮ VIỆT NAM", cx + cw / 2, cy + 124);
+
+  ctx.fillStyle = "#e11d48";
+  ctx.font = "bold 46px 'Montserrat', sans-serif";
+  ctx.fillText("20 THÁNG 10", cx + cw / 2, cy + 180);
+
+  ctx.fillStyle = "#f472b6";
+  ctx.font = "20px sans-serif";
+  ctx.fillText("─── 🌸 ✨ 💖 ✨ 🌸 ───", cx + cw / 2, cy + 218);
+
+  // Recipient Pill
+  const rPillW = Math.min(cw - 80, 620);
+  const rPillH = 60;
+  const rPillX = cx + (cw - rPillW) / 2;
+  const rPillY = cy + 242;
+  ctx.fillStyle = "#fff1f2";
+  roundRect(ctx, rPillX, rPillY, rPillW, rPillH, 30);
+  ctx.fill();
+  ctx.strokeStyle = "#e11d48";
+  ctx.lineWidth = 3.5;
+  ctx.stroke();
+
+  ctx.fillStyle = "#9f1239";
+  ctx.font = "bold 28px 'Montserrat', sans-serif";
+  ctx.fillText("Thân gửi: " + rName + " 💖", cx + cw / 2, rPillY + 41);
+
+  // Wish Content Box
+  const boxX = cx + 32;
+  const boxY = cy + 326;
+  const boxW = cw - 64;
+  const boxH = ch - 460;
+  ctx.fillStyle = "#fafaf9";
+  roundRect(ctx, boxX, boxY, boxW, boxH, 22);
+  ctx.fill();
+  ctx.strokeStyle = "#fcd34d";
+  ctx.lineWidth = 2.5;
+  ctx.stroke();
+
+  // Quotation marks
+  ctx.fillStyle = "rgba(244, 114, 182, 0.45)";
+  ctx.font = "bold 64px serif";
+  ctx.fillText("“", boxX + 38, boxY + 58);
+  ctx.fillText("”", boxX + boxW - 38, boxY + boxH - 16);
+
+  // Text wrapping
+  ctx.fillStyle = "#1e293b";
+  ctx.font = "23px 'Montserrat', sans-serif";
+  const maxTextW = boxW - 78;
+  const lineHeight = 36;
+  const words = wText.split(/\s+/);
+  const lines = [];
+  let curr = "";
+  for (let i = 0; i < words.length; i++) {
+    const test = curr ? curr + " " + words[i] : words[i];
+    if (ctx.measureText(test).width > maxTextW && curr) {
+      lines.push(curr);
+      curr = words[i];
+    } else {
+      curr = test;
+    }
+  }
+  if (curr) lines.push(curr);
+
+  const totalH = lines.length * lineHeight;
+  let startY = boxY + 52 + Math.max(0, (boxH - 85 - totalH) / 2);
+  lines.forEach(line => {
+    ctx.fillText(line, cx + cw / 2, startY);
+    startY += lineHeight;
+  });
+
+  // Signatures
+  ctx.fillStyle = "#475569";
+  ctx.font = "italic 20px 'Montserrat', sans-serif";
+  ctx.fillText("— Trân trọng, Applied Robotic Lab (ARL) ❤️🤖", cx + cw / 2, cy + ch - 96);
+
+  ctx.fillStyle = "#0284c7";
+  ctx.font = "bold 18px 'Courier New', monospace";
+  ctx.fillText("while (alive) { happiness++; love = ∞; }", cx + cw / 2, cy + ch - 62);
+
+  ctx.fillStyle = "#64748b";
+  ctx.font = "16px 'Montserrat', sans-serif";
+  ctx.fillText("🌸 https://dghung23.github.io/Woman_Day_web 🌸", cx + cw / 2, cy + ch - 28);
+}
+
+/* ==========================================================================
+   HIGH-RESOLUTION GREETING CARD PNG GENERATOR (1080x1080 FULL HD)
    ========================================================================== */
 function generateCardPngBlob(recipientName, wishText) {
   return new Promise((resolve) => {
-    const width = 720;
-    const height = 720;
+    const width = 1080;
+    const height = 1080;
     const canvas = document.createElement("canvas");
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext("2d");
 
-    function roundRect(ctx, x, y, w, h, r) {
-      ctx.beginPath();
-      ctx.moveTo(x + r, y);
-      ctx.lineTo(x + w - r, y);
-      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-      ctx.lineTo(x + w, y + h - r);
-      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-      ctx.lineTo(x + r, y + h);
-      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-      ctx.lineTo(x, y + r);
-      ctx.quadraticCurveTo(x, y, x + r, y);
-      ctx.closePath();
-    }
-
-    function drawSparkle(ctx, x, y, size, color, rot = 0) {
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(rot);
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      for (let i = 0; i < 4; i++) {
-        ctx.lineTo(Math.cos((i * Math.PI) / 2) * size, Math.sin((i * Math.PI) / 2) * size);
-        ctx.lineTo(Math.cos(((i + 0.5) * Math.PI) / 2) * (size * 0.28), Math.sin(((i + 0.5) * Math.PI) / 2) * (size * 0.28));
-      }
-      ctx.closePath();
-      ctx.fill();
-      ctx.restore();
-    }
-
-    // 1. Soft bright feminine pink background
+    // Soft bright feminine pink gradient
     const bgGrad = ctx.createLinearGradient(0, 0, width, height);
     bgGrad.addColorStop(0, "#fff5f8");
     bgGrad.addColorStop(0.35, "#ffe4ec");
@@ -581,132 +645,40 @@ function generateCardPngBlob(recipientName, wishText) {
     ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, width, height);
 
-    // Center radiant glow
-    const glow = ctx.createRadialGradient(360, 360, 40, 360, 360, 350);
-    glow.addColorStop(0, "rgba(255, 255, 255, 0.85)");
+    // Radiant soft glow
+    const glow = ctx.createRadialGradient(540, 540, 60, 540, 540, 520);
+    glow.addColorStop(0, "rgba(255, 255, 255, 0.88)");
     glow.addColorStop(1, "rgba(255, 255, 255, 0)");
     ctx.fillStyle = glow;
     ctx.fillRect(0, 0, width, height);
 
     // Top banner
     ctx.fillStyle = "#be185d";
-    ctx.font = "bold 13px 'Montserrat', sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("APPLIED ROBOTIC LAB (ARL) • 20/10/2026", 360, 28);
-
-    // 2. Pure White Greeting Card
-    const cx = 35, cy = 40, cw = 650, ch = 640;
-    ctx.fillStyle = "#ffffff";
-    roundRect(ctx, cx, cy, cw, ch, 24);
-    ctx.fill();
-
-    // Solid outer rose border
-    ctx.strokeStyle = "#f472b6";
-    ctx.lineWidth = 4;
-    roundRect(ctx, cx, cy, cw, ch, 24);
-    ctx.stroke();
-
-    // Inner delicate accent border
-    ctx.strokeStyle = "#fda4af";
-    ctx.lineWidth = 2;
-    roundRect(ctx, cx + 8, cy + 8, cw - 16, ch - 16, 18);
-    ctx.stroke();
-
-    // Header badge
-    const pillW = 320, pillH = 34, pillX = cx + (cw - pillW) / 2, pillY = cy + 22;
-    ctx.fillStyle = "#fff1f5";
-    roundRect(ctx, pillX, pillY, pillW, pillH, 17);
-    ctx.fill();
-    ctx.strokeStyle = "#f472b6";
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    ctx.fillStyle = "#9d174d";
-    ctx.font = "bold 13.5px 'Montserrat', sans-serif";
-    ctx.fillText("APPLIED ROBOTIC LAB (ARL)", cx + cw / 2, pillY + 22);
-
-    // Main Titles
-    ctx.fillStyle = "#831843";
     ctx.font = "bold 18px 'Montserrat', sans-serif";
-    ctx.fillText("CHÚC MỪNG NGÀY PHỤ NỮ VIỆT NAM", cx + cw / 2, cy + 88);
+    ctx.textAlign = "center";
+    ctx.fillText("APPLIED ROBOTIC LAB (ARL) • 20/10/2026", 540, 42);
 
-    ctx.fillStyle = "#e11d48";
-    ctx.font = "bold 32px 'Montserrat', sans-serif";
-    ctx.fillText("20 THÁNG 10", cx + cw / 2, cy + 126);
-
-    ctx.fillStyle = "#f472b6";
-    ctx.font = "15px sans-serif";
-    ctx.fillText("─── 🌸 ✨ 💖 ✨ 🌸 ───", cx + cw / 2, cy + 152);
-
-    // Recipient Pill
-    const rPillW = 440, rPillH = 44, rPillX = cx + (cw - rPillW) / 2, rPillY = cy + 170;
-    ctx.fillStyle = "#fff1f2";
-    roundRect(ctx, rPillX, rPillY, rPillW, rPillH, 22);
-    ctx.fill();
-    ctx.strokeStyle = "#e11d48";
-    ctx.lineWidth = 2.5;
-    ctx.stroke();
-
-    ctx.fillStyle = "#9f1239";
-    ctx.font = "bold 20px 'Montserrat', sans-serif";
-    ctx.fillText("Thân gửi: " + recipientName + " 💖", cx + cw / 2, rPillY + 29);
-
-    // Wish Box
-    const boxX = cx + 22, boxY = cy + 230, boxW = cw - 44, boxH = ch - 330;
-    ctx.fillStyle = "#fafaf9";
-    roundRect(ctx, boxX, boxY, boxW, boxH, 16);
-    ctx.fill();
-    ctx.strokeStyle = "#fcd34d";
-    ctx.lineWidth = 1.8;
-    ctx.stroke();
-
-    // Quotation marks
-    ctx.fillStyle = "rgba(244, 114, 182, 0.45)";
-    ctx.font = "bold 46px serif";
-    ctx.fillText("“", boxX + 28, boxY + 42);
-    ctx.fillText("”", boxX + boxW - 28, boxY + boxH - 12);
-
-    // Text wrapping
-    ctx.fillStyle = "#1e293b";
-    ctx.font = "16.5px 'Montserrat', sans-serif";
-    const maxTextW = boxW - 56;
-    const lineHeight = 25;
-    const words = wishText.split(/\s+/);
-    const lines = [];
-    let curr = "";
-    for (let i = 0; i < words.length; i++) {
-      const test = curr ? curr + " " + words[i] : words[i];
-      if (ctx.measureText(test).width > maxTextW && curr) {
-        lines.push(curr);
-        curr = words[i];
-      } else {
-        curr = test;
-      }
-    }
-    if (curr) lines.push(curr);
-
-    const totalH = lines.length * lineHeight;
-    let startY = boxY + 38 + Math.max(0, (boxH - 60 - totalH) / 2);
-    lines.forEach(line => {
-      ctx.fillText(line, cx + cw / 2, startY);
-      startY += lineHeight;
+    // Floating petals
+    const petals = [
+      { x: 100, y: 120, s: 22, a: 0.3 },
+      { x: 240, y: 280, s: 18, a: 0.9 },
+      { x: 920, y: 160, s: 24, a: -0.5 },
+      { x: 860, y: 400, s: 20, a: 1.3 },
+      { x: 130, y: 700, s: 22, a: -0.7 },
+      { x: 950, y: 820, s: 18, a: 0.6 },
+      { x: 500, y: 100, s: 16, a: 0.1 },
+      { x: 720, y: 900, s: 22, a: -0.8 }
+    ];
+    petals.forEach(p => {
+      drawPetal(ctx, p.x, p.y, p.s, p.a, "rgba(244, 114, 182, 0.75)");
     });
 
-    // Signature
-    ctx.fillStyle = "#475569";
-    ctx.font = "italic 14.5px 'Montserrat', sans-serif";
-    ctx.fillText("— Trân trọng, Applied Robotic Lab (ARL) ❤️🤖", cx + cw / 2, cy + ch - 68);
+    // Draw full crisp 1080p card
+    drawCard(ctx, 50, 50, 980, 980, recipientName, wishText);
 
-    ctx.fillStyle = "#0284c7";
-    ctx.font = "bold 13px 'Courier New', monospace";
-    ctx.fillText("while (alive) { happiness++; love = ∞; }", cx + cw / 2, cy + ch - 44);
-
-    ctx.fillStyle = "#64748b";
-    ctx.font = "11.5px 'Montserrat', sans-serif";
-    ctx.fillText("🌸 https://dghung23.github.io/Woman_Day_web 🌸", cx + cw / 2, cy + ch - 20);
-
-    drawSparkle(ctx, 60, 65, 16, "#ffffff", 0.2);
-    drawSparkle(ctx, 660, 75, 18, "#fef08a", 0.5);
+    // Sparkles
+    drawSparkle(ctx, 90, 100, 20, "#ffffff", 0.4);
+    drawSparkle(ctx, 990, 110, 22, "#fef08a", 0.8);
 
     canvas.toBlob((blob) => {
       resolve(blob);
@@ -715,104 +687,38 @@ function generateCardPngBlob(recipientName, wishText) {
 }
 
 /* ==========================================================================
-   SMOOTH & SHARP ANIMATED OPENING ENVELOPE GIF GENERATOR (720x720)
+   1080P FULL HD MOTION OPENING VIDEO GENERATOR (STOPS ON OPENED LETTER)
    ========================================================================== */
-function generateOpeningCardGifBlob(recipientName, wishText) {
-  return new Promise((resolve, reject) => {
+function generateOpeningCardVideoBlob(recipientName, wishText) {
+  return new Promise(async (resolve, reject) => {
     try {
-      const gifModule = window.gifenc || (typeof GIFEncoder !== "undefined" ? { GIFEncoder, quantize, applyPalette } : null);
-      if (!gifModule || !gifModule.GIFEncoder) {
-        throw new Error("GIFEncoder not loaded");
-      }
-
-      const { GIFEncoder, quantize, applyPalette } = gifModule;
-      const width = 720;
-      const height = 720;
-      const gif = GIFEncoder();
-
+      const width = 1080;
+      const height = 1080;
       const canvas = document.createElement("canvas");
       canvas.width = width;
       canvas.height = height;
-      const ctx = canvas.getContext("2d", { willReadFrequently: true });
-
-      function roundRect(ctx, x, y, w, h, r) {
-        ctx.beginPath();
-        ctx.moveTo(x + r, y);
-        ctx.lineTo(x + w - r, y);
-        ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-        ctx.lineTo(x + w, y + h - r);
-        ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-        ctx.lineTo(x + r, y + h);
-        ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-        ctx.lineTo(x, y + r);
-        ctx.quadraticCurveTo(x, y, x + r, y);
-        ctx.closePath();
-      }
-
-      function drawSparkle(ctx, x, y, size, color, rot = 0) {
-        ctx.save();
-        ctx.translate(x, y);
-        ctx.rotate(rot);
-        ctx.fillStyle = color;
-        ctx.beginPath();
-        for (let i = 0; i < 4; i++) {
-          ctx.lineTo(Math.cos((i * Math.PI) / 2) * size, Math.sin((i * Math.PI) / 2) * size);
-          ctx.lineTo(Math.cos(((i + 0.5) * Math.PI) / 2) * (size * 0.28), Math.sin(((i + 0.5) * Math.PI) / 2) * (size * 0.28));
-        }
-        ctx.closePath();
-        ctx.fill();
-        ctx.restore();
-      }
-
-      function drawHeart(ctx, x, y, size, color) {
-        ctx.save();
-        ctx.translate(x, y);
-        ctx.fillStyle = color;
-        ctx.beginPath();
-        const topCurveHeight = size * 0.3;
-        ctx.moveTo(0, topCurveHeight);
-        ctx.bezierCurveTo(0, 0, -size / 2, 0, -size / 2, topCurveHeight);
-        ctx.bezierCurveTo(-size / 2, (size + topCurveHeight) / 2, 0, (size + topCurveHeight) / 2, 0, size);
-        ctx.bezierCurveTo(0, (size + topCurveHeight) / 2, size / 2, (size + topCurveHeight) / 2, size / 2, topCurveHeight);
-        ctx.bezierCurveTo(size / 2, 0, 0, 0, 0, topCurveHeight);
-        ctx.closePath();
-        ctx.fill();
-        ctx.restore();
-      }
-
-      function drawPetal(ctx, x, y, size, angle, color) {
-        ctx.save();
-        ctx.translate(x, y);
-        ctx.rotate(angle);
-        ctx.fillStyle = color;
-        ctx.beginPath();
-        ctx.moveTo(0, -size);
-        ctx.bezierCurveTo(size * 0.8, -size * 0.8, size * 0.7, size * 0.6, 0, size);
-        ctx.bezierCurveTo(-size * 0.7, size * 0.6, -size * 0.8, -size * 0.8, 0, -size);
-        ctx.fill();
-        ctx.restore();
-      }
+      const ctx = canvas.getContext("2d");
 
       const petals = [
-        { x: 70, y: 80, s: 16, a: 0.3, sp: 2 },
-        { x: 160, y: 190, s: 14, a: 0.9, sp: 2.4 },
-        { x: 620, y: 110, s: 18, a: -0.5, sp: 1.8 },
-        { x: 580, y: 280, s: 15, a: 1.3, sp: 2.2 },
-        { x: 90, y: 480, s: 17, a: -0.7, sp: 2 },
-        { x: 640, y: 560, s: 14, a: 0.6, sp: 2.3 },
-        { x: 340, y: 70, s: 13, a: 0.1, sp: 1.6 },
-        { x: 490, y: 620, s: 16, a: -0.8, sp: 2.1 }
+        { x: 100, y: 120, s: 22, a: 0.3, sp: 2 },
+        { x: 240, y: 280, s: 18, a: 0.9, sp: 2.4 },
+        { x: 920, y: 160, s: 24, a: -0.5, sp: 1.8 },
+        { x: 860, y: 400, s: 20, a: 1.3, sp: 2.2 },
+        { x: 130, y: 700, s: 22, a: -0.7, sp: 2 },
+        { x: 950, y: 820, s: 18, a: 0.6, sp: 2.3 },
+        { x: 500, y: 100, s: 16, a: 0.1, sp: 1.6 },
+        { x: 720, y: 900, s: 22, a: -0.8, sp: 2.1 }
       ];
 
       const sparkles = [
-        [80, 240, 10, "#fef08a"],
-        [640, 200, 12, "#ffffff"],
-        [100, 600, 9, "#ffffff"],
-        [610, 460, 11, "#fef08a"],
-        [360, 90, 13, "#ffffff"]
+        [120, 340, 14, "#fef08a"],
+        [940, 280, 16, "#ffffff"],
+        [140, 880, 12, "#ffffff"],
+        [900, 680, 15, "#fef08a"],
+        [540, 130, 18, "#ffffff"]
       ];
 
-      function drawBg(fIdx) {
+      function drawBg(timeSec) {
         const bgGrad = ctx.createLinearGradient(0, 0, width, height);
         bgGrad.addColorStop(0, "#fff5f8");
         bgGrad.addColorStop(0.35, "#ffe4ec");
@@ -821,52 +727,48 @@ function generateOpeningCardGifBlob(recipientName, wishText) {
         ctx.fillStyle = bgGrad;
         ctx.fillRect(0, 0, width, height);
 
-        const glow = ctx.createRadialGradient(360, 360, 40, 360, 360, 350);
-        glow.addColorStop(0, "rgba(255, 255, 255, 0.85)");
+        const glow = ctx.createRadialGradient(540, 540, 60, 540, 540, 520);
+        glow.addColorStop(0, "rgba(255, 255, 255, 0.88)");
         glow.addColorStop(1, "rgba(255, 255, 255, 0)");
         ctx.fillStyle = glow;
         ctx.fillRect(0, 0, width, height);
 
-        // Top banner
         ctx.fillStyle = "#be185d";
-        ctx.font = "bold 13px 'Montserrat', sans-serif";
+        ctx.font = "bold 18px 'Montserrat', sans-serif";
         ctx.textAlign = "center";
-        ctx.fillText("APPLIED ROBOTIC LAB (ARL) • 20/10/2026", 360, 28);
+        ctx.fillText("APPLIED ROBOTIC LAB (ARL) • 20/10/2026", 540, 42);
 
-        petals.forEach((p, idx) => {
-          const curY = (p.y + fIdx * p.sp * 4) % (height + 30);
-          const curA = p.a + fIdx * 0.08;
+        petals.forEach((p) => {
+          const curY = (p.y + timeSec * p.sp * 60) % (height + 40);
+          const curA = p.a + timeSec * 1.2;
           drawPetal(ctx, p.x, curY, p.s, curA, "rgba(244, 114, 182, 0.75)");
         });
 
         sparkles.forEach(([sx, sy, ss, sc], idx) => {
-          const pulse = ss + Math.sin(fIdx * 0.5 + idx) * 2.5;
-          drawSparkle(ctx, sx, sy, Math.max(3, pulse), sc, fIdx * 0.1 + idx);
+          const pulse = ss + Math.sin(timeSec * 4 + idx) * 3.5;
+          drawSparkle(ctx, sx, sy, Math.max(4, pulse), sc, timeSec * 1.5 + idx);
         });
       }
 
-      function drawEnvelope(flapProgress, sealAlpha) {
-        const envW = 460;
-        const envH = 280;
-        const envX = 130;
-        const envY = 360;
+      const envW = 680;
+      const envH = 410;
+      const envX = 200;
+      const envY = 530;
 
-        // Envelope back
+      function drawEnvelope(flapP, sealA) {
         ctx.fillStyle = "#ffe4ec";
-        roundRect(ctx, envX, envY, envW, envH, 20);
+        roundRect(ctx, envX, envY, envW, envH, 28);
         ctx.fill();
         ctx.strokeStyle = "#f472b6";
-        ctx.lineWidth = 3.5;
+        ctx.lineWidth = 5;
         ctx.stroke();
 
-        // Inner liner
         ctx.fillStyle = "#fff0f5";
-        roundRect(ctx, envX + 8, envY + 8, envW - 16, envH - 16, 16);
+        roundRect(ctx, envX + 12, envY + 12, envW - 24, envH - 24, 22);
         ctx.fill();
 
-        // Flap
-        if (flapProgress < 1) {
-          const peakY = (envY + 160) - flapProgress * 160;
+        if (flapP < 1) {
+          const peakY = (envY + 230) - flapP * 230;
           ctx.beginPath();
           ctx.moveTo(envX, envY);
           ctx.lineTo(envX + envW, envY);
@@ -875,40 +777,38 @@ function generateOpeningCardGifBlob(recipientName, wishText) {
           ctx.fillStyle = "#fff5f8";
           ctx.fill();
           ctx.strokeStyle = "#f472b6";
-          ctx.lineWidth = 3.5;
+          ctx.lineWidth = 5;
           ctx.stroke();
 
-          // Luxury Wax Seal
-          if (sealAlpha > 0) {
+          if (sealA > 0) {
             ctx.save();
-            ctx.globalAlpha = sealAlpha;
+            ctx.globalAlpha = sealA;
             ctx.fillStyle = "#fef08a";
             ctx.strokeStyle = "#d97706";
-            ctx.lineWidth = 2.5;
+            ctx.lineWidth = 3.5;
             ctx.beginPath();
-            ctx.arc(envX + envW / 2, peakY - 18, 22, 0, Math.PI * 2);
+            ctx.arc(envX + envW / 2, peakY - 26, 32, 0, Math.PI * 2);
             ctx.fill();
             ctx.stroke();
 
             ctx.fillStyle = "#e11d48";
             ctx.beginPath();
-            ctx.arc(envX + envW / 2, peakY - 18, 17, 0, Math.PI * 2);
+            ctx.arc(envX + envW / 2, peakY - 26, 25, 0, Math.PI * 2);
             ctx.fill();
 
-            drawHeart(ctx, envX + envW / 2, peakY - 26, 22, "#ffffff");
+            drawHeart(ctx, envX + envW / 2, peakY - 38, 30, "#ffffff");
             ctx.restore();
           }
 
-          if (flapProgress > 0.15 && flapProgress < 0.75) {
+          if (flapP > 0.15 && flapP < 0.8) {
             for (let i = 0; i < 8; i++) {
               const ang = (i * Math.PI) / 4;
-              const dist = 24 + flapProgress * 30;
-              drawSparkle(ctx, envX + envW / 2 + Math.cos(ang) * dist, peakY + Math.sin(ang) * dist, 4, "#fef08a", i);
+              const dist = 32 + flapP * 45;
+              drawSparkle(ctx, envX + envW / 2 + Math.cos(ang) * dist, peakY + Math.sin(ang) * dist, 6, "#fef08a", i);
             }
           }
         } else {
-          // Flap folded up behind card
-          const peakY = envY - (flapProgress - 1) * 150;
+          const peakY = envY - (flapP - 1) * 220;
           ctx.beginPath();
           ctx.moveTo(envX, envY);
           ctx.lineTo(envX + envW, envY);
@@ -917,242 +817,140 @@ function generateOpeningCardGifBlob(recipientName, wishText) {
           ctx.fillStyle = "#fed7e2";
           ctx.fill();
           ctx.strokeStyle = "#f472b6";
-          ctx.lineWidth = 3.5;
+          ctx.lineWidth = 5;
           ctx.stroke();
         }
       }
 
-      function drawPocket(envAlpha = 1) {
-        if (envAlpha <= 0) return;
+      function drawPocket(alpha = 1) {
+        if (alpha <= 0) return;
         ctx.save();
-        ctx.globalAlpha = envAlpha;
-        const envW = 460;
-        const envH = 280;
-        const envX = 130;
-        const envY = 360;
+        ctx.globalAlpha = alpha;
 
-        // Front left
         ctx.beginPath();
         ctx.moveTo(envX, envY);
         ctx.lineTo(envX, envY + envH);
-        ctx.lineTo(envX + envW / 2, envY + 160);
+        ctx.lineTo(envX + envW / 2, envY + 230);
         ctx.closePath();
         ctx.fillStyle = "#fff5f8";
         ctx.fill();
         ctx.strokeStyle = "#fbcfe8";
-        ctx.lineWidth = 2.5;
+        ctx.lineWidth = 3.5;
         ctx.stroke();
 
-        // Front right
         ctx.beginPath();
         ctx.moveTo(envX + envW, envY);
         ctx.lineTo(envX + envW, envY + envH);
-        ctx.lineTo(envX + envW / 2, envY + 160);
+        ctx.lineTo(envX + envW / 2, envY + 230);
         ctx.closePath();
         ctx.fillStyle = "#fff0f5";
         ctx.fill();
         ctx.strokeStyle = "#fbcfe8";
-        ctx.lineWidth = 2.5;
+        ctx.lineWidth = 3.5;
         ctx.stroke();
 
-        // Front bottom
         ctx.beginPath();
         ctx.moveTo(envX, envY + envH);
         ctx.lineTo(envX + envW, envY + envH);
-        ctx.lineTo(envX + envW / 2, envY + 145);
+        ctx.lineTo(envX + envW / 2, envY + 215);
         ctx.closePath();
         ctx.fillStyle = "#fff5f8";
         ctx.fill();
         ctx.strokeStyle = "#f472b6";
-        ctx.lineWidth = 3;
+        ctx.lineWidth = 4;
         ctx.stroke();
 
         ctx.restore();
       }
 
-      function drawCard(cx, cy, cw, ch, rName, wText) {
-        // Pure White Card
-        ctx.fillStyle = "#ffffff";
-        roundRect(ctx, cx, cy, cw, ch, 24);
-        ctx.fill();
+      const mimeType = (window.MediaRecorder && MediaRecorder.isTypeSupported('video/mp4;codecs=avc1'))
+        ? 'video/mp4;codecs=avc1'
+        : ((window.MediaRecorder && MediaRecorder.isTypeSupported('video/mp4'))
+            ? 'video/mp4'
+            : 'video/webm;codecs=vp9');
 
-        // Outer Solid Rose Border
-        ctx.strokeStyle = "#f472b6";
-        ctx.lineWidth = 4;
-        roundRect(ctx, cx, cy, cw, ch, 24);
-        ctx.stroke();
+      const stream = canvas.captureStream(30);
+      const recorder = new MediaRecorder(stream, {
+        mimeType: mimeType,
+        videoBitsPerSecond: 6000000
+      });
 
-        // Inner Delicate Accent Border
-        ctx.strokeStyle = "#fda4af";
-        ctx.lineWidth = 2;
-        roundRect(ctx, cx + 8, cy + 8, cw - 16, ch - 16, 18);
-        ctx.stroke();
+      const chunks = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) chunks.push(e.data);
+      };
 
-        // Header pill badge
-        const pillW = Math.min(cw - 80, 320);
-        const pillH = 34;
-        const pillX = cx + (cw - pillW) / 2;
-        const pillY = cy + 22;
-        ctx.fillStyle = "#fff1f5";
-        roundRect(ctx, pillX, pillY, pillW, pillH, 17);
-        ctx.fill();
-        ctx.strokeStyle = "#f472b6";
-        ctx.lineWidth = 2;
-        ctx.stroke();
+      const recordPromise = new Promise((res) => {
+        recorder.onstop = () => {
+          const blob = new Blob(chunks, { type: mimeType });
+          res({ videoBlob: blob, mimeType });
+        };
+      });
 
-        ctx.fillStyle = "#9d174d";
-        ctx.font = "bold 13.5px 'Montserrat', sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillText("APPLIED ROBOTIC LAB (ARL)", cx + cw / 2, pillY + 22);
+      recorder.start();
 
-        // Titles
-        ctx.fillStyle = "#831843";
-        ctx.font = "bold 18px 'Montserrat', sans-serif";
-        ctx.fillText("CHÚC MỪNG NGÀY PHỤ NỮ VIỆT NAM", cx + cw / 2, cy + 88);
+      const totalFrames = 135; // 4.5 seconds @ 30fps
+      const fps = 30;
 
-        ctx.fillStyle = "#e11d48";
-        ctx.font = "bold 32px 'Montserrat', sans-serif";
-        ctx.fillText("20 THÁNG 10", cx + cw / 2, cy + 126);
-
-        ctx.fillStyle = "#f472b6";
-        ctx.font = "15px sans-serif";
-        ctx.fillText("─── 🌸 ✨ 💖 ✨ 🌸 ───", cx + cw / 2, cy + 152);
-
-        // Recipient Pill
-        const rPillW = Math.min(cw - 50, 440);
-        const rPillH = 44;
-        const rPillX = cx + (cw - rPillW) / 2;
-        const rPillY = cy + 170;
-        ctx.fillStyle = "#fff1f2";
-        roundRect(ctx, rPillX, rPillY, rPillW, rPillH, 22);
-        ctx.fill();
-        ctx.strokeStyle = "#e11d48";
-        ctx.lineWidth = 2.5;
-        ctx.stroke();
-
-        ctx.fillStyle = "#9f1239";
-        ctx.font = "bold 20px 'Montserrat', sans-serif";
-        ctx.fillText("Thân gửi: " + rName + " 💖", cx + cw / 2, rPillY + 29);
-
-        // Wish Content Box
-        const boxX = cx + 22, boxY = cy + 230, boxW = cw - 44, boxH = ch - 330;
-        ctx.fillStyle = "#fafaf9";
-        roundRect(ctx, boxX, boxY, boxW, boxH, 16);
-        ctx.fill();
-        ctx.strokeStyle = "#fcd34d";
-        ctx.lineWidth = 1.8;
-        ctx.stroke();
-
-        // Quotation marks
-        ctx.fillStyle = "rgba(244, 114, 182, 0.45)";
-        ctx.font = "bold 46px serif";
-        ctx.fillText("“", boxX + 28, boxY + 42);
-        ctx.fillText("”", boxX + boxW - 28, boxY + boxH - 12);
-
-        // Text wrapping
-        ctx.fillStyle = "#1e293b";
-        ctx.font = "16.5px 'Montserrat', sans-serif";
-        const maxTextW = boxW - 56;
-        const lineHeight = 25;
-        const words = wText.split(/\s+/);
-        const lines = [];
-        let curr = "";
-        for (let i = 0; i < words.length; i++) {
-          const test = curr ? curr + " " + words[i] : words[i];
-          if (ctx.measureText(test).width > maxTextW && curr) {
-            lines.push(curr);
-            curr = words[i];
-          } else {
-            curr = test;
-          }
-        }
-        if (curr) lines.push(curr);
-
-        const totalH = lines.length * lineHeight;
-        let startY = boxY + 38 + Math.max(0, (boxH - 60 - totalH) / 2);
-        lines.forEach(line => {
-          ctx.fillText(line, cx + cw / 2, startY);
-          startY += lineHeight;
-        });
-
-        // Signatures
-        ctx.fillStyle = "#475569";
-        ctx.font = "italic 14.5px 'Montserrat', sans-serif";
-        ctx.fillText("— Trân trọng, Applied Robotic Lab (ARL) ❤️🤖", cx + cw / 2, cy + ch - 68);
-
-        ctx.fillStyle = "#0284c7";
-        ctx.font = "bold 13px 'Courier New', monospace";
-        ctx.fillText("while (alive) { happiness++; love = ∞; }", cx + cw / 2, cy + ch - 44);
-
-        ctx.fillStyle = "#64748b";
-        ctx.font = "11.5px 'Montserrat', sans-serif";
-        ctx.fillText("🌸 https://dghung23.github.io/Woman_Day_web 🌸", cx + cw / 2, cy + ch - 20);
-      }
-
-      // Smooth gradual opening sequence (21 frames total)
-      const totalFrames = 21;
-      for (let f = 0; f < totalFrames; f++) {
+      for (let i = 0; i < totalFrames; i++) {
+        const t = i / fps;
         ctx.clearRect(0, 0, width, height);
-        drawBg(f);
+        drawBg(t);
 
-        let delay = 100;
-        if (f <= 2) {
+        if (t < 0.6) {
           drawEnvelope(0, 1);
           drawPocket(1);
-          delay = 140;
-        } else if (f >= 3 && f <= 9) {
-          const p = (f - 3) / 6;
+        } else if (t >= 0.6 && t < 1.6) {
+          const p = (t - 0.6) / 1.0;
           const flapP = p * 2.0;
-          const sealA = Math.max(0, 1 - p * 2.5);
+          const sealA = Math.max(0, 1 - p * 2.2);
           drawEnvelope(flapP, sealA);
           if (flapP >= 1) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(0, 0, width, envY + envH - 8);
+            ctx.clip();
             const peekProg = (flapP - 1);
-            drawCard(150, 340 - peekProg * 50, 420, 260, recipientName, wishText);
+            drawCard(ctx, 230, 520 - peekProg * 60, 620, 400, recipientName, wishText);
+            ctx.restore();
           }
           drawPocket(1);
-          delay = 90;
-        } else if (f >= 10 && f <= 13) {
+        } else if (t >= 1.6 && t < 2.5) {
           drawEnvelope(2.0, 0);
-          const slideProg = (f - 9) / 4;
-          const curCardY = 290 - slideProg * 140;
-          drawCard(150, curCardY, 420, 320, recipientName, wishText);
+          const slideP = (t - 1.6) / 0.9;
+          const curY = 460 - slideP * 240;
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(0, 0, width, envY + envH - 8);
+          ctx.clip();
+          drawCard(ctx, 230, curY, 620, 520, recipientName, wishText);
+          ctx.restore();
           drawPocket(0.95);
-          delay = 100;
-        } else if (f >= 14 && f <= 18) {
-          const expP = (f - 13) / 5;
-          const curW = 420 + (650 - 420) * expP;
-          const curH = 320 + (640 - 320) * expP;
+        } else if (t >= 2.5 && t < 3.5) {
+          const expP = (t - 2.5) / 1.0;
+          const curW = 620 + (980 - 620) * expP;
+          const curH = 520 + (980 - 520) * expP;
           const curX = (width - curW) / 2;
-          const curY = 150 - (150 - 40) * expP;
-          const envAlpha = Math.max(0, 1 - expP * 1.6);
-          if (envAlpha > 0) {
+          const curY = 220 - (220 - 50) * expP;
+          const envA = Math.max(0, 1 - expP * 1.5);
+          if (envA > 0) {
             drawEnvelope(2.0, 0);
-            drawPocket(envAlpha);
+            drawPocket(envA);
           }
-          drawCard(curX, curY, curW, curH, recipientName, wishText);
-          delay = 100;
-        } else if (f === 19) {
-          drawCard(35, 40, 650, 640, recipientName, wishText);
-          drawSparkle(ctx, 65, 70, 14, "#ffffff", 0.4);
-          drawSparkle(ctx, 655, 80, 16, "#fef08a", 0.8);
-          delay = 160;
-        } else if (f === 20) {
-          drawCard(35, 40, 650, 640, recipientName, wishText);
-          drawSparkle(ctx, 60, 65, 16, "#ffffff", 0.2);
-          drawSparkle(ctx, 660, 75, 18, "#fef08a", 0.5);
-          delay = 4000;
+          drawCard(ctx, curX, curY, curW, curH, recipientName, wishText);
+        } else {
+          // STATIONARY FULL OPEN LETTER: STOPS HERE SO USER CAN READ COMFORTABLY
+          drawCard(ctx, 50, 50, 980, 980, recipientName, wishText);
+          drawSparkle(ctx, 90, 100, 20, "#ffffff", t);
+          drawSparkle(ctx, 990, 110, 22, "#fef08a", t * 1.2);
         }
 
-        const imgData = ctx.getImageData(0, 0, width, height);
-        const palette = quantize(imgData.data, 256);
-        const index = applyPalette(imgData.data, palette);
-        gif.writeFrame(index, width, height, { palette, delay });
+        await new Promise((r) => setTimeout(r, 33));
       }
 
-      gif.finish();
-      const bytes = gif.bytes();
-      const blob = new Blob([bytes], { type: "image/gif" });
-      resolve(blob);
+      recorder.stop();
+      const result = await recordPromise;
+      resolve(result);
     } catch (err) {
       reject(err);
     }

@@ -521,8 +521,35 @@
             <button class="modal-action-btn next-wish-btn" id="next-wish-btn">
               <span>🎲</span> Đổi Lời Chúc Khác
             </button>
-            <button class="modal-action-btn copy-btn" id="copy-wish-btn" title="Sao chép ảnh thiệp (để Dán/Ctrl+V ngay) và tự động tải ngầm GIF mở thiệp">
-              <span>🎁</span> Sao Chép Hình & Tải GIF
+            <button class="modal-action-btn copy-btn" id="copy-wish-btn" title="Tạo video 1080p mở thiệp (dừng lại khi mở để dễ đọc) & sao chép hình thiệp để dán ngay">
+              <span>🎬</span> Tạo Video & Sao Chép Hình
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Video Preview Modal / Xem trước Video mở thiệp -->
+    <div class="video-preview-overlay" id="video-preview-modal" aria-hidden="true">
+      <div class="video-preview-container">
+        <button class="video-close-btn" id="video-close-btn" aria-label="Đóng">&times;</button>
+        <div class="video-player-card">
+          <div class="video-header">
+            <span class="video-badge">✨ 1080P FULL HD • ARL MOTION CARD ✨</span>
+            <h3>Video Mở Thiệp 20/10</h3>
+          </div>
+          <div class="video-wrapper">
+            <video id="card-video-player" playsinline controls preload="auto"></video>
+          </div>
+          <div class="video-modal-footer">
+            <button class="video-action-btn replay-btn" id="video-replay-btn">
+              <span>🔄</span> Xem Lại
+            </button>
+            <button class="video-action-btn download-btn" id="video-download-btn">
+              <span>⬇️</span> Tải Lại Video
+            </button>
+            <button class="video-action-btn copy-img-btn" id="video-copy-img-btn">
+              <span>📋</span> Sao Chép Hình
             </button>
           </div>
         </div>
@@ -587,7 +614,6 @@
         }
       })();
     </script>
-    <script src="gifenc.min.js"></script>
     <script src="main.js"></script>
 </body>
 </html>
