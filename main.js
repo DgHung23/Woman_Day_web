@@ -267,23 +267,36 @@ function setupModal() {
   });
 
   // Copy Wish as High-Resolution Rendered Greeting Card Image
+  // Copy Wish as Animated GIF of Opening Greeting Card
   let isGeneratingCard = false;
   copyBtn?.addEventListener("click", async () => {
     if (isGeneratingCard) return;
     isGeneratingCard = true;
     const rName = displayName.textContent.trim() || "Bóng Hồng ARL";
     const wText = wishTextEl.textContent.trim();
-    showToast("⏳ Đang render ảnh thiệp xinh xắn...");
+    showToast("⏳ Đang tạo GIF mở thiệp xinh xắn...");
 
     try {
-      const blob = await generateWishCardBlob(rName, wText);
-      let copiedToClipboard = false;
+      // 1. Generate Animated Opening Envelope Card GIF
+      let blob;
+      let isGif = false;
+      try {
+        blob = await generateOpeningCardGifBlob(rName, wText);
+        isGif = true;
+      } catch (gifErr) {
+        console.warn("GIF generation fallback to PNG:", gifErr);
+        blob = await generateWishCardBlob(rName, wText);
+      }
 
-      // 1. Write image directly to clipboard if supported by browser
+      let copiedToClipboard = false;
+      const mimeType = isGif ? "image/gif" : "image/png";
+      const fileExt = isGif ? "gif" : "png";
+
+      // 2. Write image directly to clipboard if supported by browser
       if (navigator.clipboard && window.ClipboardItem) {
         try {
           await navigator.clipboard.write([
-            new ClipboardItem({ "image/png": blob })
+            new ClipboardItem({ [mimeType]: blob })
           ]);
           copiedToClipboard = true;
         } catch (clipErr) {
@@ -291,31 +304,30 @@ function setupModal() {
         }
       }
 
-      // 2. Download the rendered card PNG (guarantees user has image file on all mobile/desktop platforms)
+      // 3. Download the animated GIF / image file (guarantees file availability across all platforms)
       const imgUrl = URL.createObjectURL(blob);
       const downloadLink = document.createElement("a");
       const cleanName = rName.replace(/[^\w\s\u00C0-\u1EF9]/gi, "").replace(/\s+/g, "_");
-      downloadLink.download = `ARL_Thiep_20_10_${cleanName || "Chuc_Mung"}.png`;
+      downloadLink.download = `ARL_Thiep_20_10_MoThiep_${cleanName || "Chuc_Mung"}.${fileExt}`;
       downloadLink.href = imgUrl;
       document.body.appendChild(downloadLink);
       downloadLink.click();
       downloadLink.remove();
-      setTimeout(() => URL.revokeObjectURL(imgUrl), 6000);
+      setTimeout(() => URL.revokeObjectURL(imgUrl), 10000);
 
-      // 3. Fallback text copy to clipboard if image clipboard was blocked
+      // 4. Fallback text copy to clipboard if binary clipboard was restricted
       if (!copiedToClipboard && navigator.clipboard?.writeText) {
-        const textFallback = `Thân gửi ${rName},\n\n${wText}\n\n— Trân trọng, Applied Robotic Lab (ARL) ❤️🤖`;
+        const textFallback = `🌸 CHÚC MỪNG 20/10 - APPLIED ROBOTIC LAB (ARL) 🌸\nThân gửi: ${rName}\n\n"${wText}"\n\n— Trân trọng, Applied Robotic Lab (ARL) ❤️🤖\nhttps://dghung23.github.io/Woman_Day_web`;
         navigator.clipboard.writeText(textFallback).catch(() => {});
       }
 
       if (copiedToClipboard) {
-        showToast("🖼️ Đã sao chép ảnh thiệp & tải về máy! 🌸");
+        showToast("🎁 Đã sao chép & tải GIF mở thiệp! Bạn có thể dán (Ctrl+V) ngay 🌸");
       } else {
-        showToast("🖼️ Đã lưu ảnh thiệp chúc mừng về máy! 🌸");
+        showToast("🎁 Đã tải GIF mở thiệp về máy! Bạn có thể gửi file GIF này ngay 🌸");
       }
     } catch (err) {
       console.error("Render card error:", err);
-      // Plain text fallback
       const textFallback = `Thân gửi ${rName},\n\n${wText}\n\n— Trân trọng, Applied Robotic Lab (ARL) ❤️🤖`;
       navigator.clipboard?.writeText(textFallback).then(() => {
         showToast("Đã sao chép lời chúc vào bộ nhớ tạm! 📋");
@@ -506,6 +518,455 @@ function generateWishCardBlob(recipientName, wishText) {
     canvas.toBlob((blob) => {
       resolve(blob);
     }, "image/png");
+  });
+}
+
+/* ==========================================================================
+   ANIMATED OPENING ENVELOPE GREETING CARD GIF GENERATOR (540x540)
+   ========================================================================== */
+function generateOpeningCardGifBlob(recipientName, wishText) {
+  return new Promise((resolve, reject) => {
+    try {
+      const gifModule = window.gifenc || (typeof GIFEncoder !== "undefined" ? { GIFEncoder, quantize, applyPalette } : null);
+      if (!gifModule || !gifModule.GIFEncoder) {
+        throw new Error("GIFEncoder not loaded");
+      }
+
+      const { GIFEncoder, quantize, applyPalette } = gifModule;
+      const width = 540;
+      const height = 540;
+      const gif = GIFEncoder();
+
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+
+      function roundRect(ctx, x, y, w, h, r) {
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.lineTo(x + w - r, y);
+        ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+        ctx.lineTo(x + w, y + h - r);
+        ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+        ctx.lineTo(x + r, y + h);
+        ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+        ctx.lineTo(x, y + r);
+        ctx.quadraticCurveTo(x, y, x + r, y);
+        ctx.closePath();
+      }
+
+      function drawSparkle(ctx, x, y, size, color, rot = 0) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(rot);
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        for (let i = 0; i < 4; i++) {
+          ctx.lineTo(Math.cos((i * Math.PI) / 2) * size, Math.sin((i * Math.PI) / 2) * size);
+          ctx.lineTo(Math.cos(((i + 0.5) * Math.PI) / 2) * (size * 0.28), Math.sin(((i + 0.5) * Math.PI) / 2) * (size * 0.28));
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+
+      function drawHeart(ctx, x, y, size, color) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        const topCurveHeight = size * 0.3;
+        ctx.moveTo(0, topCurveHeight);
+        ctx.bezierCurveTo(0, 0, -size / 2, 0, -size / 2, topCurveHeight);
+        ctx.bezierCurveTo(-size / 2, (size + topCurveHeight) / 2, 0, (size + topCurveHeight) / 2, 0, size);
+        ctx.bezierCurveTo(0, (size + topCurveHeight) / 2, size / 2, (size + topCurveHeight) / 2, size / 2, topCurveHeight);
+        ctx.bezierCurveTo(size / 2, 0, 0, 0, 0, topCurveHeight);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+
+      function drawPetal(ctx, x, y, size, angle, color) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(angle);
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(0, -size);
+        ctx.bezierCurveTo(size * 0.8, -size * 0.8, size * 0.7, size * 0.6, 0, size);
+        ctx.bezierCurveTo(-size * 0.7, size * 0.6, -size * 0.8, -size * 0.8, 0, -size);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      const petals = [
+        { x: 50, y: 70, s: 12, a: 0.2, sp: 2 },
+        { x: 120, y: 150, s: 10, a: 0.8, sp: 2.5 },
+        { x: 470, y: 90, s: 14, a: -0.4, sp: 1.8 },
+        { x: 430, y: 220, s: 11, a: 1.2, sp: 2.2 },
+        { x: 70, y: 380, s: 13, a: -0.8, sp: 2 },
+        { x: 480, y: 440, s: 10, a: 0.5, sp: 2.4 },
+        { x: 260, y: 60, s: 9, a: 0.1, sp: 1.5 },
+        { x: 380, y: 490, s: 12, a: -0.6, sp: 2 }
+      ];
+
+      const sparkles = [
+        [60, 180, 7, "#fef08a"],
+        [480, 160, 8, "#ffffff"],
+        [80, 460, 6, "#ffffff"],
+        [460, 360, 7, "#fef08a"],
+        [270, 80, 9, "#ffffff"]
+      ];
+
+      function drawBg(fIdx) {
+        // Bright feminine pink gradient
+        const bgGrad = ctx.createLinearGradient(0, 0, width, height);
+        bgGrad.addColorStop(0, "#fff5f8");
+        bgGrad.addColorStop(0.35, "#ffe4ec");
+        bgGrad.addColorStop(0.7, "#fce7f3");
+        bgGrad.addColorStop(1, "#fbcfe8");
+        ctx.fillStyle = bgGrad;
+        ctx.fillRect(0, 0, width, height);
+
+        // Center radiant romantic glow
+        const glow = ctx.createRadialGradient(270, 270, 30, 270, 270, 260);
+        glow.addColorStop(0, "rgba(255, 255, 255, 0.7)");
+        glow.addColorStop(1, "rgba(255, 255, 255, 0)");
+        ctx.fillStyle = glow;
+        ctx.fillRect(0, 0, width, height);
+
+        // Top banner
+        ctx.fillStyle = "#be185d";
+        ctx.font = "bold 11px 'Montserrat', sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("APPLIED ROBOTIC LAB (ARL) • 20/10/2026", 270, 24);
+
+        // Floating petals
+        petals.forEach((p, idx) => {
+          const curY = (p.y + fIdx * p.sp * 5) % (height + 20);
+          const curA = p.a + fIdx * 0.1;
+          drawPetal(ctx, p.x, curY, p.s, curA, "rgba(251, 113, 133, 0.65)");
+        });
+
+        // Sparkles
+        sparkles.forEach(([sx, sy, ss, sc], idx) => {
+          const pulse = ss + Math.sin(fIdx * 0.6 + idx) * 2;
+          drawSparkle(ctx, sx, sy, Math.max(2, pulse), sc, fIdx * 0.1 + idx);
+        });
+      }
+
+      function drawEnvelope(fIdx, flapProgress, sealAlpha) {
+        const envW = 340;
+        const envH = 200;
+        const envX = 100;
+        const envY = 280;
+
+        // Envelope back
+        ctx.fillStyle = "#ffe4ec";
+        roundRect(ctx, envX, envY, envW, envH, 16);
+        ctx.fill();
+        ctx.strokeStyle = "#f472b6";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // Inner envelope liner
+        ctx.fillStyle = "#fff0f5";
+        roundRect(ctx, envX + 6, envY + 6, envW - 12, envH - 12, 12);
+        ctx.fill();
+
+        // Top flap
+        if (flapProgress < 1) {
+          const peakY = (envY + 115) - flapProgress * 115;
+          ctx.beginPath();
+          ctx.moveTo(envX, envY);
+          ctx.lineTo(envX + envW, envY);
+          ctx.lineTo(envX + envW / 2, peakY);
+          ctx.closePath();
+          ctx.fillStyle = "#fff1f5";
+          ctx.fill();
+          ctx.strokeStyle = "#f472b6";
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+
+          // Heart Wax Seal
+          if (sealAlpha > 0) {
+            ctx.save();
+            ctx.globalAlpha = sealAlpha;
+            ctx.fillStyle = "#fef08a";
+            ctx.beginPath();
+            ctx.arc(envX + envW / 2, peakY - 14, 14, 0, Math.PI * 2);
+            ctx.fill();
+            drawHeart(ctx, envX + envW / 2, peakY - 20, 20, "#e11d48");
+            drawSparkle(ctx, envX + envW / 2 - 3, peakY - 15, 3.5, "#ffffff", 0);
+            ctx.restore();
+          }
+
+          if (flapProgress > 0.15 && flapProgress < 0.7) {
+            for (let i = 0; i < 6; i++) {
+              const ang = (i * Math.PI) / 3;
+              const dist = 18 + flapProgress * 20;
+              drawSparkle(ctx, envX + envW / 2 + Math.cos(ang) * dist, peakY + Math.sin(ang) * dist, 3, "#fef08a", i);
+            }
+          }
+        } else {
+          // Flap opened upward behind card
+          const peakY = envY - (flapProgress - 1) * 110;
+          ctx.beginPath();
+          ctx.moveTo(envX, envY);
+          ctx.lineTo(envX + envW, envY);
+          ctx.lineTo(envX + envW / 2, peakY);
+          ctx.closePath();
+          ctx.fillStyle = "#fed7e2";
+          ctx.fill();
+          ctx.strokeStyle = "#f472b6";
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        }
+      }
+
+      function drawPocket(envAlpha = 1) {
+        if (envAlpha <= 0) return;
+        ctx.save();
+        ctx.globalAlpha = envAlpha;
+        const envW = 340;
+        const envH = 200;
+        const envX = 100;
+        const envY = 280;
+
+        // Front left flap
+        ctx.beginPath();
+        ctx.moveTo(envX, envY);
+        ctx.lineTo(envX, envY + envH);
+        ctx.lineTo(envX + envW / 2, envY + 115);
+        ctx.closePath();
+        ctx.fillStyle = "#fff5f8";
+        ctx.fill();
+        ctx.strokeStyle = "#fbcfe8";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Front right flap
+        ctx.beginPath();
+        ctx.moveTo(envX + envW, envY);
+        ctx.lineTo(envX + envW, envY + envH);
+        ctx.lineTo(envX + envW / 2, envY + 115);
+        ctx.closePath();
+        ctx.fillStyle = "#fff0f5";
+        ctx.fill();
+        ctx.strokeStyle = "#fbcfe8";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Front bottom flap
+        ctx.beginPath();
+        ctx.moveTo(envX, envY + envH);
+        ctx.lineTo(envX + envW, envY + envH);
+        ctx.lineTo(envX + envW / 2, envY + 105);
+        ctx.closePath();
+        ctx.fillStyle = "#fff5f8";
+        ctx.fill();
+        ctx.strokeStyle = "#f472b6";
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+
+        ctx.restore();
+      }
+
+      function drawCard(cx, cy, cw, ch, rName, wText) {
+        // Pure White Card
+        ctx.fillStyle = "#ffffff";
+        roundRect(ctx, cx, cy, cw, ch, 18);
+        ctx.fill();
+
+        // Outer Rose Border
+        ctx.strokeStyle = "#f472b6";
+        ctx.lineWidth = 1.5;
+        roundRect(ctx, cx, cy, cw, ch, 18);
+        ctx.stroke();
+
+        // Inner Delicate Accent Border
+        ctx.strokeStyle = "#fda4af";
+        ctx.lineWidth = 0.9;
+        roundRect(ctx, cx + 5, cy + 5, cw - 10, ch - 10, 14);
+        ctx.stroke();
+
+        // Header pill badge
+        const pillW = Math.min(cw - 60, 240);
+        const pillH = 24;
+        const pillX = cx + (cw - pillW) / 2;
+        const pillY = cy + 16;
+        ctx.fillStyle = "#fff1f5";
+        roundRect(ctx, pillX, pillY, pillW, pillH, 12);
+        ctx.fill();
+        ctx.strokeStyle = "#fbcfe8";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        ctx.fillStyle = "#be185d";
+        ctx.font = "bold 10.5px 'Montserrat', sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("APPLIED ROBOTIC LAB (ARL)", cx + cw / 2, pillY + 16);
+
+        // Titles
+        ctx.fillStyle = "#9d174d";
+        ctx.font = "bold 13px 'Montserrat', sans-serif";
+        ctx.fillText("CHÚC MỪNG NGÀY PHỤ NỮ VIỆT NAM", cx + cw / 2, cy + 62);
+
+        ctx.fillStyle = "#e11d48";
+        ctx.font = "bold 22px 'Montserrat', sans-serif";
+        ctx.fillText("20 THÁNG 10", cx + cw / 2, cy + 88);
+
+        ctx.fillStyle = "#f472b6";
+        ctx.font = "11px sans-serif";
+        ctx.fillText("─── 🌸 ✨ 🌸 ───", cx + cw / 2, cy + 107);
+
+        // Recipient Pill
+        const rPillW = Math.min(cw - 36, 320);
+        const rPillH = 32;
+        const rPillX = cx + (cw - rPillW) / 2;
+        const rPillY = cy + 120;
+        ctx.fillStyle = "#fff1f2";
+        roundRect(ctx, rPillX, rPillY, rPillW, rPillH, 16);
+        ctx.fill();
+        ctx.strokeStyle = "#f43f5e";
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+
+        ctx.fillStyle = "#9f1239";
+        ctx.font = "bold 14px 'Montserrat', sans-serif";
+        ctx.fillText("Thân gửi: " + rName + " 💖", cx + cw / 2, rPillY + 21);
+
+        // Wish Content Box
+        const boxX = cx + 16;
+        const boxY = cy + 164;
+        const boxW = cw - 32;
+        const boxH = ch - 238;
+        ctx.fillStyle = "#fafaf9";
+        roundRect(ctx, boxX, boxY, boxW, boxH, 12);
+        ctx.fill();
+        ctx.strokeStyle = "#fed7aa";
+        ctx.lineWidth = 0.8;
+        ctx.stroke();
+
+        // Quotation marks
+        ctx.fillStyle = "rgba(244, 114, 182, 0.4)";
+        ctx.font = "bold 34px serif";
+        ctx.fillText("“", boxX + 20, boxY + 30);
+        ctx.fillText("”", boxX + boxW - 20, boxY + boxH - 8);
+
+        // Word wrap text
+        ctx.fillStyle = "#374151";
+        ctx.font = "12.5px 'Montserrat', sans-serif";
+        const maxTextW = boxW - 40;
+        const lineHeight = 19;
+        const words = wText.split(/\s+/);
+        const lines = [];
+        let curr = "";
+        for (let i = 0; i < words.length; i++) {
+          const test = curr ? curr + " " + words[i] : words[i];
+          if (ctx.measureText(test).width > maxTextW && curr) {
+            lines.push(curr);
+            curr = words[i];
+          } else {
+            curr = test;
+          }
+        }
+        if (curr) lines.push(curr);
+
+        const totalH = lines.length * lineHeight;
+        let startY = boxY + 28 + Math.max(0, (boxH - 45 - totalH) / 2);
+        lines.forEach(line => {
+          ctx.fillText(line, cx + cw / 2, startY);
+          startY += lineHeight;
+        });
+
+        // Signatures
+        ctx.fillStyle = "#6b7280";
+        ctx.font = "italic 11px 'Montserrat', sans-serif";
+        ctx.fillText("— Trân trọng, Applied Robotic Lab (ARL) ❤️🤖", cx + cw / 2, cy + ch - 50);
+
+        ctx.fillStyle = "#0284c7";
+        ctx.font = "10px 'Courier New', monospace";
+        ctx.fillText("while (alive) { happiness++; love = ∞; }", cx + cw / 2, cy + ch - 32);
+
+        ctx.fillStyle = "#9ca3af";
+        ctx.font = "9px 'Montserrat', sans-serif";
+        ctx.fillText("🌸 https://dghung23.github.io/Woman_Day_web 🌸", cx + cw / 2, cy + ch - 15);
+      }
+
+      // Generate 13 frames
+      const totalFrames = 13;
+      for (let f = 0; f < totalFrames; f++) {
+        ctx.clearRect(0, 0, width, height);
+        drawBg(f);
+
+        let delay = 120;
+        if (f <= 1) {
+          drawEnvelope(f, 0, 1);
+          drawPocket(1);
+          delay = 160;
+        } else if (f === 2) {
+          drawEnvelope(f, 0.45, 0.7);
+          drawPocket(1);
+          delay = 110;
+        } else if (f === 3) {
+          drawEnvelope(f, 0.95, 0);
+          drawPocket(1);
+          delay = 110;
+        } else if (f === 4) {
+          drawEnvelope(f, 1.9, 0);
+          drawCard(115, 250, 310, 200, recipientName, wishText);
+          drawPocket(1);
+          delay = 110;
+        } else if (f === 5) {
+          drawEnvelope(f, 2.0, 0);
+          drawCard(115, 190, 310, 240, recipientName, wishText);
+          drawPocket(1);
+          delay = 120;
+        } else if (f === 6) {
+          drawEnvelope(f, 2.0, 0);
+          drawCard(115, 130, 310, 280, recipientName, wishText);
+          drawPocket(0.9);
+          delay = 120;
+        } else if (f >= 7 && f <= 10) {
+          const expandProg = (f - 6) / 4;
+          const curW = 310 + (480 - 310) * expandProg;
+          const curH = 280 + (475 - 280) * expandProg;
+          const curX = (width - curW) / 2;
+          const curY = 130 - (130 - 32) * expandProg;
+          const envAlpha = Math.max(0, 1 - expandProg * 1.5);
+          if (envAlpha > 0) {
+            drawEnvelope(f, 2.0, 0);
+            drawPocket(envAlpha);
+          }
+          drawCard(curX, curY, curW, curH, recipientName, wishText);
+          delay = 120;
+        } else if (f === 11) {
+          drawCard(30, 32, 480, 475, recipientName, wishText);
+          drawSparkle(ctx, 50, 50, 10, "#ffffff", 0.4);
+          drawSparkle(ctx, 490, 60, 12, "#fef08a", 0.8);
+          delay = 160;
+        } else if (f === 12) {
+          drawCard(30, 32, 480, 475, recipientName, wishText);
+          drawSparkle(ctx, 48, 48, 12, "#ffffff", 0.2);
+          drawSparkle(ctx, 492, 58, 14, "#fef08a", 0.5);
+          delay = 3500;
+        }
+
+        const imgData = ctx.getImageData(0, 0, width, height);
+        const palette = quantize(imgData.data, 256);
+        const index = applyPalette(imgData.data, palette);
+        gif.writeFrame(index, width, height, { palette, delay });
+      }
+
+      gif.finish();
+      const bytes = gif.bytes();
+      const blob = new Blob([bytes], { type: "image/gif" });
+      resolve(blob);
+    } catch (err) {
+      reject(err);
+    }
   });
 }
 
