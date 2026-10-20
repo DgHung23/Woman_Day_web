@@ -663,10 +663,24 @@ function triggerWishBannerBurst(count = 4) {
   }
 }
 
+function playFlowerSFX() {
+  const sfx = document.getElementById("flower-sfx");
+  if (sfx) {
+    try {
+      sfx.currentTime = 0;
+      sfx.volume = 0.75;
+      sfx.play().catch(() => {});
+    } catch (e) {
+      console.warn("SFX error:", e);
+    }
+  }
+}
+
 function setupFlowerRain() {
   const rainBtn = document.getElementById("petal-rain-btn");
   rainBtn?.addEventListener("click", () => {
-    triggerPetalBurst(25);
+    playFlowerSFX();
+    triggerPetalBurst(28);
     triggerWishBannerBurst(4);
     showToast("🌸 Chúc bạn luôn rạng rỡ như hoa mùa xuân! ✨");
   });
