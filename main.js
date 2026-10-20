@@ -503,92 +503,94 @@ function drawPetal(ctx, x, y, size, angle, color) {
 }
 
 function drawCard(ctx, cx, cy, cw, ch, rName, wText) {
+  const scale = cw / 1000;
   // Pure White Card
   ctx.fillStyle = "#ffffff";
-  roundRect(ctx, cx, cy, cw, ch, 32);
+  roundRect(ctx, cx, cy, cw, ch, 32 * scale);
   ctx.fill();
 
   // Outer Solid Rose Border
   ctx.strokeStyle = "#f472b6";
-  ctx.lineWidth = 5.5;
-  roundRect(ctx, cx, cy, cw, ch, 32);
+  ctx.lineWidth = 6 * scale;
+  roundRect(ctx, cx, cy, cw, ch, 32 * scale);
   ctx.stroke();
 
   // Inner Delicate Accent Border
   ctx.strokeStyle = "#fda4af";
-  ctx.lineWidth = 2.8;
-  roundRect(ctx, cx + 12, cy + 12, cw - 24, ch - 24, 24);
+  ctx.lineWidth = 3 * scale;
+  roundRect(ctx, cx + 12 * scale, cy + 12 * scale, cw - 24 * scale, ch - 24 * scale, 24 * scale);
   ctx.stroke();
 
   // Header badge
-  const pillW = Math.min(cw - 120, 480);
-  const pillH = 48;
+  const pillW = Math.min(cw - 80, 540 * scale);
+  const pillH = 50 * scale;
   const pillX = cx + (cw - pillW) / 2;
-  const pillY = cy + 30;
+  const pillY = cy + 24 * scale;
   ctx.fillStyle = "#fff1f5";
-  roundRect(ctx, pillX, pillY, pillW, pillH, 24);
+  roundRect(ctx, pillX, pillY, pillW, pillH, 25 * scale);
   ctx.fill();
   ctx.strokeStyle = "#f472b6";
-  ctx.lineWidth = 2.5;
+  ctx.lineWidth = 2.5 * scale;
   ctx.stroke();
 
   ctx.fillStyle = "#9d174d";
-  ctx.font = "bold 19px 'Montserrat', sans-serif";
+  ctx.font = "bold " + Math.max(12, Math.round(20 * scale)) + "px 'Montserrat', sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText("APPLIED ROBOTIC LAB (ARL)", cx + cw / 2, pillY + 31);
+  ctx.fillText("APPLIED ROBOTIC LAB (ARL)", cx + cw / 2, pillY + 32 * scale);
 
   // Titles
   ctx.fillStyle = "#831843";
-  ctx.font = "bold 25px 'Montserrat', sans-serif";
-  ctx.fillText("CHÚC MỪNG NGÀY PHỤ NỮ VIỆT NAM", cx + cw / 2, cy + 124);
+  ctx.font = "bold " + Math.max(14, Math.round(28 * scale)) + "px 'Montserrat', sans-serif";
+  ctx.fillText("CHÚC MỪNG NGÀY PHỤ NỮ VIỆT NAM", cx + cw / 2, cy + 115 * scale);
 
   ctx.fillStyle = "#e11d48";
-  ctx.font = "bold 46px 'Montserrat', sans-serif";
-  ctx.fillText("20 THÁNG 10", cx + cw / 2, cy + 180);
+  ctx.font = "bold " + Math.max(22, Math.round(54 * scale)) + "px 'Montserrat', sans-serif";
+  ctx.fillText("20 THÁNG 10", cx + cw / 2, cy + 175 * scale);
 
   ctx.fillStyle = "#f472b6";
-  ctx.font = "20px sans-serif";
-  ctx.fillText("─── 🌸 ✨ 💖 ✨ 🌸 ───", cx + cw / 2, cy + 218);
+  ctx.font = Math.max(12, Math.round(22 * scale)) + "px sans-serif";
+  ctx.fillText("─── 🌸 ✨ 💖 ✨ 🌸 ───", cx + cw / 2, cy + 212 * scale);
 
   // Recipient Pill
-  const rPillW = Math.min(cw - 80, 620);
-  const rPillH = 60;
+  const rPillW = Math.min(cw - 60, 680 * scale);
+  const rPillH = 68 * scale;
   const rPillX = cx + (cw - rPillW) / 2;
-  const rPillY = cy + 242;
+  const rPillY = cy + 234 * scale;
   ctx.fillStyle = "#fff1f2";
-  roundRect(ctx, rPillX, rPillY, rPillW, rPillH, 30);
+  roundRect(ctx, rPillX, rPillY, rPillW, rPillH, 34 * scale);
   ctx.fill();
   ctx.strokeStyle = "#e11d48";
-  ctx.lineWidth = 3.5;
+  ctx.lineWidth = 3.5 * scale;
   ctx.stroke();
 
   ctx.fillStyle = "#9f1239";
-  ctx.font = "bold 28px 'Montserrat', sans-serif";
-  ctx.fillText("Thân gửi: " + rName + " 💖", cx + cw / 2, rPillY + 41);
+  ctx.font = "bold " + Math.max(16, Math.round(32 * scale)) + "px 'Montserrat', sans-serif";
+  ctx.fillText("Thân gửi: " + rName + " 💖", cx + cw / 2, rPillY + 46 * scale);
 
-  // Wish Content Box
-  const boxX = cx + 32;
-  const boxY = cy + 326;
-  const boxW = cw - 64;
-  const boxH = ch - 460;
+  // Wish Box
+  const boxX = cx + 36 * scale;
+  const boxY = cy + 322 * scale;
+  const boxW = cw - 72 * scale;
+  const boxH = 490 * scale;
   ctx.fillStyle = "#fafaf9";
-  roundRect(ctx, boxX, boxY, boxW, boxH, 22);
+  roundRect(ctx, boxX, boxY, boxW, boxH, 24 * scale);
   ctx.fill();
   ctx.strokeStyle = "#fcd34d";
-  ctx.lineWidth = 2.5;
+  ctx.lineWidth = 2.5 * scale;
   ctx.stroke();
 
   // Quotation marks
-  ctx.fillStyle = "rgba(244, 114, 182, 0.45)";
-  ctx.font = "bold 64px serif";
-  ctx.fillText("“", boxX + 38, boxY + 58);
-  ctx.fillText("”", boxX + boxW - 38, boxY + boxH - 16);
+  ctx.fillStyle = "rgba(244, 114, 182, 0.4)";
+  ctx.font = "bold " + Math.max(28, Math.round(76 * scale)) + "px serif";
+  ctx.fillText("“", boxX + 42 * scale, boxY + 68 * scale);
+  ctx.fillText("”", boxX + boxW - 42 * scale, boxY + boxH - 18 * scale);
 
-  // Text wrapping
-  ctx.fillStyle = "#1e293b";
-  ctx.font = "23px 'Montserrat', sans-serif";
-  const maxTextW = boxW - 78;
-  const lineHeight = 36;
+  // High-Legibility Large Wish Text
+  ctx.fillStyle = "#0f172a";
+  const fSize = Math.max(14, Math.round(32 * scale));
+  const lHeight = Math.max(20, Math.round(52 * scale));
+  ctx.font = "600 " + fSize + "px 'Montserrat', 'Segoe UI', -apple-system, sans-serif";
+  const maxTextW = boxW - 88 * scale;
   const words = wText.split(/\s+/);
   const lines = [];
   let curr = "";
@@ -603,25 +605,25 @@ function drawCard(ctx, cx, cy, cw, ch, rName, wText) {
   }
   if (curr) lines.push(curr);
 
-  const totalH = lines.length * lineHeight;
-  let startY = boxY + 52 + Math.max(0, (boxH - 85 - totalH) / 2);
+  const totalH = lines.length * lHeight;
+  let startY = boxY + 42 * scale + Math.max(0, (boxH - 60 * scale - totalH) / 2);
   lines.forEach(line => {
     ctx.fillText(line, cx + cw / 2, startY);
-    startY += lineHeight;
+    startY += lHeight;
   });
 
   // Signatures
-  ctx.fillStyle = "#475569";
-  ctx.font = "italic 20px 'Montserrat', sans-serif";
-  ctx.fillText("— Trân trọng, Applied Robotic Lab (ARL) ❤️🤖", cx + cw / 2, cy + ch - 96);
+  ctx.fillStyle = "#334155";
+  ctx.font = "italic bold " + Math.max(11, Math.round(23 * scale)) + "px 'Montserrat', sans-serif";
+  ctx.fillText("— Trân trọng, Applied Robotic Lab (ARL) ❤️🤖", cx + cw / 2, cy + ch - 96 * scale);
 
   ctx.fillStyle = "#0284c7";
-  ctx.font = "bold 18px 'Courier New', monospace";
-  ctx.fillText("while (alive) { happiness++; love = ∞; }", cx + cw / 2, cy + ch - 62);
+  ctx.font = "bold " + Math.max(10, Math.round(20 * scale)) + "px 'Courier New', monospace";
+  ctx.fillText("while (alive) { happiness++; love = ∞; }", cx + cw / 2, cy + ch - 60 * scale);
 
   ctx.fillStyle = "#64748b";
-  ctx.font = "16px 'Montserrat', sans-serif";
-  ctx.fillText("🌸 https://dghung23.github.io/Woman_Day_web 🌸", cx + cw / 2, cy + ch - 28);
+  ctx.font = "600 " + Math.max(9, Math.round(16.5 * scale)) + "px 'Montserrat', sans-serif";
+  ctx.fillText("🌸 https://dghung23.github.io/Woman_Day_web 🌸", cx + cw / 2, cy + ch - 26 * scale);
 }
 
 /* ==========================================================================
@@ -647,38 +649,38 @@ function generateCardPngBlob(recipientName, wishText) {
 
     // Radiant soft glow
     const glow = ctx.createRadialGradient(540, 540, 60, 540, 540, 520);
-    glow.addColorStop(0, "rgba(255, 255, 255, 0.88)");
+    glow.addColorStop(0, "rgba(255, 255, 255, 0.92)");
     glow.addColorStop(1, "rgba(255, 255, 255, 0)");
     ctx.fillStyle = glow;
     ctx.fillRect(0, 0, width, height);
 
     // Top banner
     ctx.fillStyle = "#be185d";
-    ctx.font = "bold 18px 'Montserrat', sans-serif";
+    ctx.font = "bold 16px 'Montserrat', sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("APPLIED ROBOTIC LAB (ARL) • 20/10/2026", 540, 42);
+    ctx.fillText("APPLIED ROBOTIC LAB (ARL) • 20/10/2026", 540, 32);
 
     // Floating petals
     const petals = [
-      { x: 100, y: 120, s: 22, a: 0.3 },
-      { x: 240, y: 280, s: 18, a: 0.9 },
-      { x: 920, y: 160, s: 24, a: -0.5 },
-      { x: 860, y: 400, s: 20, a: 1.3 },
-      { x: 130, y: 700, s: 22, a: -0.7 },
-      { x: 950, y: 820, s: 18, a: 0.6 },
-      { x: 500, y: 100, s: 16, a: 0.1 },
-      { x: 720, y: 900, s: 22, a: -0.8 }
+      { x: 90, y: 110, s: 22, a: 0.3 },
+      { x: 230, y: 260, s: 18, a: 0.9 },
+      { x: 930, y: 150, s: 24, a: -0.5 },
+      { x: 880, y: 380, s: 20, a: 1.3 },
+      { x: 120, y: 720, s: 22, a: -0.7 },
+      { x: 960, y: 840, s: 18, a: 0.6 },
+      { x: 480, y: 90, s: 16, a: 0.1 },
+      { x: 740, y: 920, s: 22, a: -0.8 }
     ];
     petals.forEach(p => {
-      drawPetal(ctx, p.x, p.y, p.s, p.a, "rgba(244, 114, 182, 0.75)");
+      drawPetal(ctx, p.x, p.y, p.s, p.a, "rgba(244, 114, 182, 0.7)");
     });
 
     // Draw full crisp 1080p card
-    drawCard(ctx, 50, 50, 980, 980, recipientName, wishText);
+    drawCard(ctx, 40, 40, 1000, 1000, recipientName, wishText);
 
     // Sparkles
-    drawSparkle(ctx, 90, 100, 20, "#ffffff", 0.4);
-    drawSparkle(ctx, 990, 110, 22, "#fef08a", 0.8);
+    drawSparkle(ctx, 80, 85, 20, "#ffffff", 0.4);
+    drawSparkle(ctx, 1000, 95, 22, "#fef08a", 0.8);
 
     canvas.toBlob((blob) => {
       resolve(blob);
@@ -911,7 +913,7 @@ function generateOpeningCardVideoBlob(recipientName, wishText) {
             ctx.rect(0, 0, width, envY + envH - 8);
             ctx.clip();
             const peekProg = (flapP - 1);
-            drawCard(ctx, 230, 520 - peekProg * 60, 620, 400, recipientName, wishText);
+            drawCard(ctx, 230, 520 - peekProg * 60, 620, 520, recipientName, wishText);
             ctx.restore();
           }
           drawPocket(1);
@@ -928,10 +930,10 @@ function generateOpeningCardVideoBlob(recipientName, wishText) {
           drawPocket(0.95);
         } else if (t >= 2.5 && t < 3.5) {
           const expP = (t - 2.5) / 1.0;
-          const curW = 620 + (980 - 620) * expP;
-          const curH = 520 + (980 - 520) * expP;
+          const curW = 620 + (1000 - 620) * expP;
+          const curH = 520 + (1000 - 520) * expP;
           const curX = (width - curW) / 2;
-          const curY = 220 - (220 - 50) * expP;
+          const curY = 220 - (220 - 40) * expP;
           const envA = Math.max(0, 1 - expP * 1.5);
           if (envA > 0) {
             drawEnvelope(2.0, 0);
@@ -940,9 +942,9 @@ function generateOpeningCardVideoBlob(recipientName, wishText) {
           drawCard(ctx, curX, curY, curW, curH, recipientName, wishText);
         } else {
           // STATIONARY FULL OPEN LETTER: STOPS HERE SO USER CAN READ COMFORTABLY
-          drawCard(ctx, 50, 50, 980, 980, recipientName, wishText);
-          drawSparkle(ctx, 90, 100, 20, "#ffffff", t);
-          drawSparkle(ctx, 990, 110, 22, "#fef08a", t * 1.2);
+          drawCard(ctx, 40, 40, 1000, 1000, recipientName, wishText);
+          drawSparkle(ctx, 80, 85, 20, "#ffffff", t);
+          drawSparkle(ctx, 1000, 95, 22, "#fef08a", t * 1.2);
         }
 
         await new Promise((r) => setTimeout(r, 33));
